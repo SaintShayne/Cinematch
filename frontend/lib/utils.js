@@ -70,16 +70,6 @@ export function getRecentlyViewed() {
   }
 }
 
-/**
- * Build a URL-safe slug from a movie title for sharing/state.
- */
-export function titleToSlug(title) {
-  return encodeURIComponent(title)
-}
-
-export function slugToTitle(slug) {
-  return decodeURIComponent(slug)
-}
 
 /**
  * Merge class names (simple utility, no clsx dependency needed).
@@ -87,3 +77,4 @@ export function slugToTitle(slug) {
 export function cn(...classes) {
   return classes.filter(Boolean).join(' ')
 }
+

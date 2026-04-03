@@ -10,7 +10,6 @@ import Button from '../../components/ui/Button'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingState from '../../components/ui/LoadingState'
 import { useWatchlist } from '../../lib/hooks/useWatchlist'
-import { formatYear } from '../../lib/utils'
 
 function WatchlistCard({ item, onGetRecs, onRemove }) {
   const [imgError, setImgError] = useState(false)
@@ -54,8 +53,8 @@ function WatchlistCard({ item, onGetRecs, onRemove }) {
         </p>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions — always visible on mobile, hover-reveal on desktop */}
+      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           size="sm"
           variant="secondary"

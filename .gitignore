@@ -31,3 +31,7 @@ frontend/.env.local
 *.tmp.*
 *.tmp
 *.bak
+
+node_modules/
+test-results/
+playwright-report/

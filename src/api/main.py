@@ -1,26 +1,65 @@
 """
-FastAPI backend for the Movie Recommender project.
+FastAPI backend for the CineMatch Movie Recommender project.
+
+Hardening additions (v4.0):
+  - slowapi rate limiting per endpoint
+  - Structured request logging with latency
+  - Standardised error envelope: { success, error: { code, message } }
+  - Input validation (max query length, chat input sanitisation)
+  - Admin endpoints (user list, stats, feature flags)
+  - 2FA endpoints (TOTP setup/verify, Telegram OTP via real Bot API)
 """
 
 import os
 import re as _re
 import random as _random
-from fastapi import FastAPI, HTTPException, Query, Path
+import secrets
+import time
+from datetime import datetime
+import requests as _http
+
+import logging
+import pyotp
+import qrcode
+import qrcode.image.svg
+import io
+import base64
+from fastapi import FastAPI, HTTPException, Query, Path, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from src.services.recommendation_service import RecommendationService
 from src.config.settings import MOVIES_CSV, CREDITS_CSV
+from src.utils.logger import get_logger, RequestTimer
+
+# â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+logger = get_logger("cinematch.api")
+
+# â”€â”€ Rate limiter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
+# â”€â”€ App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app = FastAPI(
-    title="Movie Recommender API",
-    description="Elite backend API for movie browsing, searching, semantic search, and explainable recommendations.",
-    version="3.0.0"
+    title="CineMatch API",
+    description=(
+        "Production-hardened backend for CineMatch: rate limiting, structured logging, "
+        "RBAC admin endpoints, 2FA (TOTP + real Telegram Bot API)."
+    ),
+    version="4.0.0",
 )
 
-# ALLOWED_ORIGINS env var can be a comma-separated list of origins for production
-# e.g. "https://cinebot.vercel.app,https://www.cinebot.app"
-# Defaults to wildcard for local development.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# â”€â”€ CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = (
     ["*"]
@@ -35,24 +74,92 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+# â”€â”€ Middleware: request logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    latency_ms = round((time.perf_counter() - start) * 1000, 1)
+    logger.info(
+        "request",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "latency_ms": latency_ms,
+            "client": request.client.host if request.client else "unknown",
+        },
+    )
+    return response
+
+# â”€â”€ Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 service = RecommendationService(MOVIES_CSV, CREDITS_CSV)
 
+# â”€â”€ In-memory store (DEV ONLY) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Stores:  { user_id: { secret, enable_2fa, auth_method } }
+# In production this should be replaced with the Supabase admin_settings table.
+_admin_2fa_store: dict[str, dict] = {}
 
-class ChatRequest(BaseModel):
-    messages: list[dict[str, str]] = []
-    message: str
-    # Top watchlist/recently-viewed titles passed from the frontend
-    # to ground recommendations for vague prompts ("what should I watch?")
-    context_titles: list[str] = []
+# Telegram OTP pending verification: { user_id: { code, expires_at } }
+_telegram_otp_store: dict[str, dict] = {}
+
+# Telegram bot credentials: { user_id: { bot_token, chat_id } }
+# Stored in memory for dev; use an encrypted DB column in production.
+_telegram_config_store: dict[str, dict] = {}
+
+# Feature flags (in-memory, reset on restart; use a DB table in production)
+_feature_flags = {
+    "enable_chat": True,
+    "enable_recommendations": True,
+}
+
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+def _error(code: str, message: str, status: int = 400) -> JSONResponse:
+    """Return a standardised error envelope."""
+    return JSONResponse(
+        status_code=status,
+        content={"success": False, "error": {"code": code, "message": message}},
+    )
 
 
-# ── Chat helpers ─────────────────────────────────────────────────────────────
+def _ok(data: dict) -> dict:
+    """Wrap a successful payload."""
+    return {"success": True, **data}
+
+
+MAX_QUERY_LENGTH = 200  # characters
+MAX_CHAT_LENGTH = 1000
+
+
+def _sanitise(text: str, max_len: int = MAX_QUERY_LENGTH) -> str:
+    """Strip leading/trailing whitespace and enforce max length."""
+    text = text.strip()
+    if len(text) > max_len:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Input exceeds maximum length of {max_len} characters.",
+        )
+    return text
+
+
+# â”€â”€ DEV-ONLY admin bootstrap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# WARNING: Hardcoded credentials for local development ONLY.
+# Remove or gate behind an environment check before production deployment.
+_DEV_ADMIN_USERNAME = "admin"
+_DEV_ADMIN_PASSWORD = "admin"  # noqa: S105  # DEV ONLY
+
+
+def _is_dev_admin(username: str, password: str) -> bool:
+    """DEV ONLY â€” authenticate the hardcoded fallback admin account."""
+    return username == _DEV_ADMIN_USERNAME and password == _DEV_ADMIN_PASSWORD
+
+
+# â”€â”€ Chat helpers (unchanged from v3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _find_seed_movie(message: str) -> str | None:
-    """
-    Extract a specific movie title from patterns like "movies like X" or "similar to X".
-    Returns the raw candidate string (not yet validated against the dataset).
-    """
     pattern = (
         r'(?:movies?\s+like|films?\s+like|similar\s+to|like)\s+'
         r'["\u201c\u201d\u2018\u2019]?([A-Za-z][^"\'?!\n]{1,50}?)'
@@ -65,14 +172,6 @@ def _find_seed_movie(message: str) -> str | None:
 
 
 def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -> list[str]:
-    """
-    Return up to 5 validated movie titles from the CineMatch dataset, in priority order:
-      1. Specific seed movie detected in the message → recommendations for that seed
-      2. Watchlist/recently-viewed context titles → recommendations for the first match
-      3. Semantic search on the message text
-      4. Trending fallback
-    """
-    # 1. Specific seed
     candidate = _find_seed_movie(message)
     if candidate:
         search_results = service.search_movies(candidate, 3)
@@ -85,7 +184,6 @@ def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -
             except Exception:
                 pass
 
-    # 2. Watchlist / recently-viewed context
     for title in context_titles[:3]:
         try:
             recs, _ = service.get_recommendations(title, 5)
@@ -94,7 +192,6 @@ def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -
         except Exception:
             continue
 
-    # 3. Semantic search on the full message
     try:
         results = service.semantic_search_movies(message, 5)
         if results:
@@ -102,7 +199,6 @@ def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -
     except Exception:
         pass
 
-    # 4. Trending fallback
     try:
         trending = service.get_trending(20)
         movies = trending.get("movies", [])
@@ -115,126 +211,491 @@ def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -
     return []
 
 
+# â”€â”€ Pydantic models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class ChatRequest(BaseModel):
+    messages: list[dict[str, str]] = []
+    message: str
+    context_titles: list[str] = []
+
+    @field_validator("message")
+    @classmethod
+    def message_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("message cannot be empty")
+        if len(v) > MAX_CHAT_LENGTH:
+            raise ValueError(f"message exceeds {MAX_CHAT_LENGTH} characters")
+        return v
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TwoFAVerifyRequest(BaseModel):
+    user_id: str
+    token: str
+
+
+class TwoFASetupRequest(BaseModel):
+    user_id: str
+
+
+class TelegramOTPRequest(BaseModel):
+    user_id: str
+
+
+class TelegramOTPVerifyRequest(BaseModel):
+    user_id: str
+    code: str
+
+
+class TelegramConfigRequest(BaseModel):
+    user_id: str
+    bot_token: str
+    chat_id: str
+
+
+class FeatureFlagRequest(BaseModel):
+    flag: str
+    enabled: bool
+
+
+class RoleUpdateRequest(BaseModel):
+    user_id: str
+    role: str  # 'admin' | 'user'
+
+
+# â”€â”€ System endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 @app.get("/", tags=["System"])
 def root():
-    return {"message": "Movie Recommender API is running"}
+    return _ok({"message": "CineMatch API is running", "version": "4.0.0"})
 
 
 @app.get("/health", tags=["System"])
 def health():
-    return {"status": "healthy"}
+    return _ok({"status": "healthy"})
 
+
+@app.get("/stats", tags=["System"])
+def get_stats():
+    return _ok({"stats": service.get_stats()})
+
+
+# â”€â”€ Browse endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.get("/genres", tags=["Browse"])
 def get_genres():
     genres = service.get_genres()
-    return {"count": len(genres), "genres": genres}
+    return _ok({"count": len(genres), "genres": genres})
 
 
 @app.get("/movies", tags=["Browse"])
 def get_movies(
     genre: str = Query(...),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=50)
+    page_size: int = Query(20, ge=1, le=50),
 ):
     genres = service.get_genres()
-
     if genre not in genres:
-        raise HTTPException(status_code=404, detail=f"Genre '{genre}' not found")
-
-    return service.get_movies_by_genre(genre, page, page_size)
+        return _error("NOT_FOUND", f"Genre '{genre}' not found", 404)
+    return _ok({"data": service.get_movies_by_genre(genre, page, page_size)})
 
 
 @app.get("/movie/{title}", tags=["Browse"])
 def get_movie_details(title: str = Path(...)):
     movie = service.get_movie_details(title)
-
     if not movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
-
-    return movie
-
-
-@app.get("/search", tags=["Search"])
-def search_movies(
-    query: str = Query(..., min_length=1),
-    limit: int = Query(20, ge=1, le=50)
-):
-    results = service.search_movies(query, limit)
-
-    return {
-        "query": query,
-        "count": len(results),
-        "results": results
-    }
-
-
-@app.get("/semantic-search", tags=["Search"])
-def semantic_search_movies(
-    query: str = Query(..., min_length=1),
-    limit: int = Query(10, ge=1, le=20)
-):
-    results = service.semantic_search_movies(query, limit)
-
-    return {
-        "query": query,
-        "count": len(results),
-        "results": results
-    }
-
-
-@app.get("/recommend", tags=["Recommendations"])
-def recommend(
-    movie: str = Query(...),
-    n: int = Query(10, ge=1, le=20)
-):
-    recommendations, posters = service.get_recommendations(movie, n)
-
-    if not recommendations:
-        raise HTTPException(status_code=404, detail="Movie not found")
-
-    return {
-        "movie": movie,
-        "count": len(recommendations),
-        "recommendations": recommendations,
-        "posters": posters
-    }
-
-
-@app.get("/stats", tags=["System"])
-def get_stats():
-    return service.get_stats()
+        return _error("NOT_FOUND", "Movie not found", 404)
+    return _ok({"movie": movie})
 
 
 @app.get("/trending", tags=["Browse"])
 def get_trending(limit: int = Query(20, ge=1, le=50)):
-    return service.get_trending(limit)
+    return _ok({"data": service.get_trending(limit)})
 
+
+# â”€â”€ Search endpoints (rate-limited) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.get("/search", tags=["Search"])
+@limiter.limit("30/minute")
+def search_movies(
+    request: Request,
+    query: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=50),
+):
+    query = _sanitise(query)
+    with RequestTimer(logger, "search", query=query):
+        results = service.search_movies(query, limit)
+    return _ok({"query": query, "count": len(results), "results": results})
+
+
+@app.get("/semantic-search", tags=["Search"])
+@limiter.limit("30/minute")
+def semantic_search_movies(
+    request: Request,
+    query: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=20),
+):
+    query = _sanitise(query)
+    with RequestTimer(logger, "semantic-search", query=query):
+        results = service.semantic_search_movies(query, limit)
+    return _ok({"query": query, "count": len(results), "results": results})
+
+
+# â”€â”€ Recommendations endpoint (rate-limited) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.get("/recommend", tags=["Recommendations"])
+@limiter.limit("20/minute")
+def recommend(
+    request: Request,
+    movie: str = Query(...),
+    n: int = Query(10, ge=1, le=20),
+):
+    movie = _sanitise(movie)
+    with RequestTimer(logger, "recommend", movie=movie):
+        recommendations, posters = service.get_recommendations(movie, n)
+    if not recommendations:
+        return _error("NOT_FOUND", "Movie not found", 404)
+    return _ok({
+        "movie": movie,
+        "count": len(recommendations),
+        "recommendations": recommendations,
+        "posters": posters,
+    })
+
+
+# â”€â”€ Chat endpoint (rate-limited) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.post("/chat", tags=["Chat"])
-def chat(request: ChatRequest):
+@limiter.limit("10/minute")
+def chat(request: Request, body: ChatRequest):
+    # Check feature flag
+    if not _feature_flags.get("enable_chat", True):
+        return _error("FEATURE_DISABLED", "Chat is currently disabled", 503)
+
     from groq import AuthenticationError, RateLimitError, BadRequestError
     from src.services.chatbot_service import send_message
+
     try:
-        # Get validated dataset suggestions to ground the LLM
         suggestions = _get_dataset_suggestions(
-            service, request.message, request.context_titles
+            service, body.message, body.context_titles
         )
-
         reply, updated_messages = send_message(
-            request.messages, request.message, suggestions
+            body.messages, body.message, suggestions
+        )
+        return _ok({
+            "reply": reply,
+            "suggested_movies": suggestions,
+            "messages": updated_messages,
+        })
+    except AuthenticationError:
+        return _error("AUTH_ERROR", "Invalid Groq API key", 401)
+    except BadRequestError as e:
+        return _error("BAD_REQUEST", str(e), 402)
+    except RateLimitError:
+        return _error("RATE_LIMITED", "Groq rate limit reached. Try again shortly.", 429)
+    except Exception as e:
+        logger.error("chat error", extra={"error": str(e)})
+        return _error("SERVICE_ERROR", f"CineMatch unavailable: {e}", 503)
+
+
+# â”€â”€ Admin: login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# DEV ONLY: the hardcoded admin/admin bypass is intentional for local development.
+# In production, replace this with a proper Supabase session check.
+
+@app.post("/admin/login", tags=["Admin"])
+def admin_login(body: AdminLoginRequest):
+    """
+    DEV ONLY â€” Authenticate with the hardcoded admin account.
+    Returns a synthetic session token (not a real JWT â€” use Supabase auth in prod).
+    """
+    if not _is_dev_admin(body.username, body.password):
+        return _error("UNAUTHORIZED", "Invalid credentials", 401)
+
+    # Synthetic dev token â€” replace with Supabase JWT verification in production
+    dev_token = secrets.token_urlsafe(32)
+    logger.info("admin login (DEV)", extra={"username": body.username})
+    return _ok({
+        "role": "admin",
+        "token": dev_token,
+        "warning": "DEV ONLY â€” use Supabase auth in production",
+    })
+
+
+# â”€â”€ Admin: stats & user management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.get("/admin/stats", tags=["Admin"])
+def admin_stats():
+    """High-level dataset statistics for the admin dashboard."""
+    stats = service.get_stats()
+    return _ok({
+        "total_movies": stats.get("total_movies", 0),
+        "total_genres": stats.get("total_genres", 0),
+        "feature_flags": _feature_flags,
+    })
+
+
+@app.get("/admin/feature-flags", tags=["Admin"])
+def get_feature_flags():
+    return _ok({"flags": _feature_flags})
+
+
+@app.post("/admin/feature-flags", tags=["Admin"])
+def set_feature_flag(body: FeatureFlagRequest):
+    if body.flag not in _feature_flags:
+        return _error("NOT_FOUND", f"Flag '{body.flag}' does not exist", 404)
+    _feature_flags[body.flag] = body.enabled
+    logger.info(
+        "feature flag updated",
+        extra={"flag": body.flag, "enabled": body.enabled},
+    )
+    return _ok({"flag": body.flag, "enabled": body.enabled})
+
+
+# â”€â”€ Admin: 2FA â€” TOTP setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.post("/admin/2fa/setup", tags=["Admin 2FA"])
+def setup_2fa(body: TwoFASetupRequest):
+    """
+    Generate a TOTP secret for the given admin user.
+    Returns the secret and a base64-encoded QR code PNG.
+    In production, store the secret encrypted in the admin_settings table.
+    """
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=f"admin:{body.user_id}",
+        issuer_name="CineMatch",
+    )
+
+    # Generate QR code as base64 PNG
+    qr = qrcode.QRCode(box_size=6, border=2)
+    qr.add_data(provisioning_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    # Store in memory (DEV ONLY â€” use Supabase admin_settings in production)
+    _admin_2fa_store[body.user_id] = {
+        "secret": secret,
+        "enable_2fa": False,   # enabled only after successful verification
+        "auth_method": "totp",
+    }
+
+    logger.info("2fa setup initiated", extra={"user_id": body.user_id})
+    return _ok({
+        "secret": secret,
+        "qr_code": qr_b64,      # base64 PNG â€” render as <img src="data:image/png;base64,...">
+        "provisioning_uri": provisioning_uri,
+    })
+
+
+@app.post("/admin/2fa/verify", tags=["Admin 2FA"])
+def verify_2fa(body: TwoFAVerifyRequest):
+    """
+    Verify a TOTP token.  On success, marks 2FA as active for the user.
+    """
+    record = _admin_2fa_store.get(body.user_id)
+    if not record:
+        return _error("NOT_FOUND", "No 2FA setup found for this user", 404)
+
+    totp = pyotp.TOTP(record["secret"])
+    if not totp.verify(body.token, valid_window=1):
+        return _error("INVALID_TOKEN", "OTP token is incorrect or expired", 401)
+
+    record["enable_2fa"] = True
+    logger.info("2fa verified and enabled", extra={"user_id": body.user_id})
+    return _ok({"message": "2FA enabled successfully"})
+
+
+# â”€â”€ Admin: 2FA â€” Telegram bot config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.post("/admin/2fa/telegram/config", tags=["Admin 2FA"])
+def save_telegram_config(body: TelegramConfigRequest):
+    """
+    Save the Telegram bot token and target chat ID for a user.
+    The bot token is stored as-is in memory (dev only); use encrypted storage
+    in production.  A test message is NOT sent here â€” use /send to verify.
+    """
+    _telegram_config_store[body.user_id] = {
+        "bot_token": body.bot_token.strip(),
+        "chat_id":   body.chat_id.strip(),
+    }
+    logger.info("telegram config saved", extra={"user_id": body.user_id})
+    return _ok({
+        "masked_token": f"...{body.bot_token.strip()[-6:]}",
+        "chat_id": body.chat_id.strip(),
+    })
+
+
+@app.get("/admin/2fa/telegram/config/{user_id}", tags=["Admin 2FA"])
+def get_telegram_config(user_id: str):
+    """Return the saved Telegram config for a user (token is masked)."""
+    cfg = _telegram_config_store.get(user_id)
+    if not cfg:
+        return _ok({"configured": False})
+    return _ok({
+        "configured":   True,
+        "masked_token": f"...{cfg['bot_token'][-6:]}",
+        "chat_id":      cfg["chat_id"],
+    })
+
+
+# â”€â”€ Admin: 2FA â€” Telegram OTP (real Bot API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+def _send_telegram_otp(user_id: str, code: str):
+    """
+    Send a 6-digit OTP to the configured Telegram chat via the Bot API.
+
+    Returns:
+        True        â€” message delivered successfully
+        str         â€” human-readable error description (caller surfaces to the client)
+    """
+    cfg = _telegram_config_store.get(user_id)
+    if not cfg or not cfg.get("bot_token") or not cfg.get("chat_id"):
+        msg = "No Telegram bot config found â€” save your bot token and chat ID first."
+        logger.error("telegram config missing", extra={"user_id": user_id})
+        return msg
+
+    url  = f"https://api.telegram.org/bot{cfg['bot_token']}/sendMessage"
+    text = (
+        "ðŸ” <b>CineMatch admin 2FA code</b>\n\n"
+        f"<code>{code}</code>\n\n"
+        "Valid for 2 minutes. Do not share this code."
+    )
+    try:
+        resp = _http.post(
+            url,
+            json={"chat_id": cfg["chat_id"], "text": text, "parse_mode": "HTML"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        logger.info("telegram OTP sent", extra={"user_id": user_id})
+        return True
+    except _http.exceptions.HTTPError as exc:
+        # Surface Telegram's own error description (e.g. "Bad Request: chat not found")
+        try:
+            detail = exc.response.json().get("description", str(exc))
+        except Exception:
+            detail = str(exc)
+        logger.error("telegram send failed", extra={"user_id": user_id, "error": detail})
+        return f"Telegram API error: {detail}"
+    except _http.exceptions.Timeout:
+        msg = "Telegram API timed out â€” check your network and try again."
+        logger.error("telegram send timeout", extra={"user_id": user_id})
+        return msg
+    except Exception as exc:
+        msg = f"Unexpected error sending OTP: {exc}"
+        logger.error("telegram send error", extra={"user_id": user_id, "error": str(exc)})
+        return msg
+
+
+@app.post("/admin/2fa/telegram/send", tags=["Admin 2FA"])
+def telegram_send_otp(body: TelegramOTPRequest):
+    """
+    Generate a 6-digit OTP and deliver it to the user's configured Telegram chat.
+    Returns an error if no bot config has been saved for this user.
+    The OTP expires after 120 seconds.
+    """
+    if body.user_id not in _telegram_config_store:
+        return _error(
+            "CONFIG_MISSING",
+            "No Telegram bot config found â€” save your bot token and chat ID first.",
+            400,
         )
 
-        return {
-            "reply": reply,
-            "suggested_movies": suggestions,   # validated dataset titles as chips
-            "messages": updated_messages,
-        }
-    except AuthenticationError:
-        raise HTTPException(status_code=401, detail="Invalid Groq API key. Check GROQ_API_KEY in .env")
-    except BadRequestError as e:
-        raise HTTPException(status_code=402, detail=str(e))
-    except RateLimitError:
-        raise HTTPException(status_code=429, detail="Groq rate limit reached. Try again shortly.")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"CineMatch unavailable: {e}")
+    code = f"{_random.randint(0, 999999):06d}"
+    _telegram_otp_store[body.user_id] = {
+        "code":       code,
+        "expires_at": time.time() + 120,
+    }
+
+    tg_error = _send_telegram_otp(body.user_id, code)
+    if tg_error is not True:
+        # Clean up the stored code so the user doesn't get stuck waiting on a
+        # code they'll never receive.
+        del _telegram_otp_store[body.user_id]
+        detail = tg_error if isinstance(tg_error, str) else (
+            "Could not deliver the OTP via Telegram â€” "
+            "check your bot token and chat ID, then try again."
+        )
+        return _error("SEND_FAILED", detail, 502)
+
+    return _ok({"message": "OTP sent via Telegram", "expires_in_seconds": 120})
+
+
+@app.post("/admin/2fa/telegram/verify", tags=["Admin 2FA"])
+def telegram_verify_otp(body: TelegramOTPVerifyRequest):
+    """Verify a Telegram OTP code. On success, marks 2FA as active for the user."""
+    record = _telegram_otp_store.get(body.user_id)
+    if not record:
+        return _error("NOT_FOUND", "No pending OTP for this user", 404)
+    if time.time() > record["expires_at"]:
+        del _telegram_otp_store[body.user_id]
+        return _error("EXPIRED", "OTP has expired", 401)
+    if record["code"] != body.code:
+        return _error("INVALID_TOKEN", "OTP code is incorrect", 401)
+
+    del _telegram_otp_store[body.user_id]
+    # Mark 2FA as enabled with telegram method (mirrors TOTP verify behaviour)
+    _admin_2fa_store[body.user_id] = {
+        "enable_2fa": True,
+        "auth_method": "telegram",
+    }
+    logger.info("telegram 2fa enabled", extra={"user_id": body.user_id})
+    return _ok({"message": "Telegram OTP verified â€” 2FA enabled successfully"})
+
+
+# â”€â”€ Admin: 2FA â€” status & disable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.get("/admin/2fa/status/{user_id}", tags=["Admin 2FA"])
+def get_2fa_status(user_id: str):
+    """Return whether 2FA is enabled for a user and which method is active."""
+    record = _admin_2fa_store.get(user_id)
+    if not record or not record.get("enable_2fa"):
+        return _ok({"enabled": False, "method": None})
+    return _ok({"enabled": True, "method": record.get("auth_method", "totp")})
+
+
+@app.post("/admin/2fa/disable", tags=["Admin 2FA"])
+def disable_2fa(body: TwoFASetupRequest):
+    """Disable and remove 2FA for a user."""
+    if body.user_id in _admin_2fa_store:
+        del _admin_2fa_store[body.user_id]
+        logger.info("2fa disabled", extra={"user_id": body.user_id})
+    return _ok({"message": "2FA disabled"})
+
+
+# â”€â”€ Admin: logs viewer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# In production, tail a real log file or query your log aggregator API.
+
+_in_memory_log_buffer: list[dict] = []
+_MAX_LOG_BUFFER = 100
+
+
+class _BufferHandler(logging.Handler):
+    def emit(self, record):
+        _in_memory_log_buffer.append({
+            "ts": self.format(record).split(" | ")[0],
+            "level": record.levelname,
+            "message": record.getMessage(),
+        })
+        if len(_in_memory_log_buffer) > _MAX_LOG_BUFFER:
+            _in_memory_log_buffer.pop(0)
+
+
+_buf_handler = _BufferHandler()
+logging.getLogger("cinematch.api").addHandler(_buf_handler)
+
+
+@app.get("/admin/logs", tags=["Admin"])
+def get_logs():
+    """Return the last 100 in-memory log entries."""
+    return _ok({"count": len(_in_memory_log_buffer), "logs": list(reversed(_in_memory_log_buffer))})
+

@@ -34,7 +34,6 @@ CREDITS_CSV = RAW_DATA_DIR / "tmdb_5000_credits.csv"
 # -------------------------------
 # CACHE FILES
 # -------------------------------
-SIMILARITY_CACHE = CACHE_DIR / "similarity.pkl"
 POSTER_CACHE_PATH = CACHE_DIR / "posters.json"
 
 # -------------------------------
@@ -48,24 +47,17 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # -------------------------------
-# OMDB SETTINGS  (free key at omdbapi.com — 1 000 req/day)
+# OMDB SETTINGS  (free key at omdbapi.com â€” 1 000 req/day)
 # -------------------------------
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 TMDB_SEARCH_URL = "https://api.themoviedb.org/3/search/movie"
 
 # -------------------------------
-# FRONTEND / BACKEND SETTINGS
 # -------------------------------
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")
 
 # -------------------------------
-# UI SETTINGS
 # -------------------------------
-MOVIES_PER_PAGE = 20
-POSTER_WIDTH = 160
-GRID_COLUMNS = 10
-GRID_ROWS = 2
 
 # -------------------------------
 # MODEL SETTINGS

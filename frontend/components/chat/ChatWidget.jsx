@@ -6,10 +6,6 @@ import { cn } from '../../lib/utils'
 import { api } from '../../lib/api'
 import { useWatchlist } from '../../lib/hooks/useWatchlist'
 
-/**
- * Strip markdown formatting that the LLM sometimes emits.
- * We render plain text — no asterisks, no headers.
- */
 function stripMarkdown(text) {
   return text
     .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -19,11 +15,6 @@ function stripMarkdown(text) {
     .trim()
 }
 
-/**
- * A single chat message bubble.
- * - User messages: right-aligned, red tint
- * - Assistant messages: left-aligned, grey; suggested_movies rendered as chips below
- */
 function MessageBubble({ message, onMovieClick }) {
   const isUser = message.role === 'user'
   const chips = (!isUser && message.suggested_movies) || []
@@ -36,7 +27,6 @@ function MessageBubble({ message, onMovieClick }) {
         </div>
       )}
       <div className="flex flex-col gap-2 max-w-[82%]">
-        {/* Reply text */}
         <div
           className={cn(
             'px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap break-words',
@@ -48,7 +38,6 @@ function MessageBubble({ message, onMovieClick }) {
           {stripMarkdown(message.content)}
         </div>
 
-        {/* Dataset movie chips — only on assistant messages with suggestions */}
         {chips.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {chips.map((title) => (
@@ -87,16 +76,11 @@ export default function ChatWidget() {
     }
   }, [open, messages])
 
-  // Route to recommendations with just the clean title
   const handleMovieClick = (title) => {
-    router.push(`/recommendations?movie=${encodeURIComponent(title)}`)
+    router.push(`/?q=${encodeURIComponent(title)}`)
     setOpen(false)
   }
 
-  /**
-   * Send a message.
-   * @param {string} [textOverride] — used when suggestion chips auto-send
-   */
   const sendMessage = async (textOverride) => {
     const text = (textOverride ?? input).trim()
     if (!text || loading) return
@@ -107,9 +91,7 @@ export default function ChatWidget() {
     setLoading(true)
 
     try {
-      // Pass top watchlist titles so the backend can use them for vague prompts
       const contextTitles = watchlist.slice(0, 5).map((w) => w.movie_title)
-
       const history = messages.map((m) => ({ role: m.role, content: m.content }))
       const data = await api.chat(history, text, contextTitles)
 
@@ -145,10 +127,8 @@ export default function ChatWidget() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-      {/* Chat panel */}
       {open && (
         <div className="w-80 rounded-2xl bg-surface border border-[rgba(255,255,255,0.1)] shadow-elevated flex flex-col overflow-hidden animate-slide-up">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
             <div className="flex items-center gap-2">
               <span className="text-base">🎬</span>
@@ -165,7 +145,6 @@ export default function ChatWidget() {
             </button>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-0 max-h-80">
             {messages.length === 0 ? (
               <div className="text-center py-6">
@@ -198,7 +177,6 @@ export default function ChatWidget() {
               ))
             )}
 
-            {/* Typing indicator */}
             {loading && (
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-red/20 flex-shrink-0 flex items-center justify-center text-sm">
@@ -220,7 +198,6 @@ export default function ChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <div className="px-3 pb-3 pt-2 border-t border-[rgba(255,255,255,0.06)]">
             <div className="flex gap-2">
               <input
@@ -247,7 +224,6 @@ export default function ChatWidget() {
         </div>
       )}
 
-      {/* FAB */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Open CineMatch chat"
@@ -264,7 +240,11 @@ export default function ChatWidget() {
           </svg>
         ) : (
           <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-            <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v5a2 2 0 01-2 2H8.5l-3.5 3v-3H4a2 2 0 01-2-2V5z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M2 5a2 2 0 012-2h12a2 2 0 012 2v5a2 2 0 01-2 2H8.5l-3.5 3v-3H4a2 2 0 01-2-2V5z"
+              clipRule="evenodd"
+            />
           </svg>
         )}
       </button>

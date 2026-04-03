@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useRef } from 'react'
 import { cn } from '../../lib/utils'
 
 export default function SearchBar({
@@ -27,7 +27,6 @@ export default function SearchBar({
 
   return (
     <div className="w-full max-w-2xl">
-      {/* Mode toggle */}
       {onModeChange && (
         <div className="flex gap-1 mb-3">
           {['smart', 'title'].map((m) => (
@@ -48,12 +47,15 @@ export default function SearchBar({
         </div>
       )}
 
-      {/* Input row */}
       <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
         <div className="relative flex-1">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+                clipRule="evenodd"
+              />
             </svg>
           </span>
           <input
@@ -65,8 +67,8 @@ export default function SearchBar({
             placeholder={
               placeholder ||
               (mode === 'smart'
-                ? 'Try "movies like Inception" or "feel-good 90s comedy"…'
-                : 'Search by title…')
+                ? 'Try "movies like Inception" or "feel-good 90s comedy"...'
+                : 'Search by title...')
             }
             autoFocus={autoFocus}
             className={cn(

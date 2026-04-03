@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { cn, formatRating, formatYear, matchPercent, matchColor } from '../../lib/utils'
+import { cn, matchPercent, matchColor } from '../../lib/utils'
 import { useAuth } from '../../lib/context/AuthContext'
 import { useWatchlist } from '../../lib/hooks/useWatchlist'
 import { useRecentlyViewed } from '../../lib/hooks/useRecentlyViewed'
@@ -43,6 +43,7 @@ function RecommendationCard({ rec, poster, onSelect }) {
 
   return (
     <div
+      data-testid="rec-card"
       onClick={handleSelect}
       className={cn(
         'group relative rounded-xl overflow-hidden cursor-pointer',
@@ -115,11 +116,11 @@ function RecommendationCard({ rec, poster, onSelect }) {
   )
 }
 
-export default function RecommendationPanel({ recommendations, posters, onSelect, loading }) {
+export default function RecommendationPanel({ recommendations, posters, onSelect, loading, count = 10 }) {
   if (loading) {
     return (
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-        {Array.from({ length: 10 }).map((_, i) => (
+        {Array.from({ length: count }).map((_, i) => (
           <div key={i} className="rounded-xl overflow-hidden bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
             <div className="skeleton aspect-[2/3]" />
             <div className="p-3 space-y-2">

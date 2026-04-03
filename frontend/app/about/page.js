@@ -1,48 +1,156 @@
 import PageHero from '../../components/layout/PageHero'
 import Badge from '../../components/ui/Badge'
 import SupportCTA from '../../components/support/SupportCTA'
-import { TECH_STACK } from '../../lib/constants'
+
+// â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const FEATURES = [
   {
-    icon: '🔍',
+    icon: 'ðŸ”',
     title: 'Semantic Search',
-    desc: 'Describe a vibe, emotion, or plot — the engine understands natural language and finds the right film.',
+    desc: 'Describe a vibe, emotion, or plot â€” the engine understands natural language and finds the right film.',
   },
   {
-    icon: '✨',
+    icon: 'âœ¨',
     title: 'Hybrid Recommendations',
-    desc: 'A custom scoring formula combining content similarity, genre overlap, cast, and quality signals.',
+    desc: 'Custom scoring formula combining content similarity, genre overlap, cast, and quality signals.',
   },
   {
-    icon: '🤖',
+    icon: 'ðŸ¤–',
     title: 'AI Chat',
-    desc: 'Chat with CineMatch — ask for recommendations, trivia, or explore genres through conversation.',
+    desc: 'Chat with CineMatch â€” ask for recommendations, trivia, or explore genres through conversation.',
   },
   {
-    icon: '🎬',
+    icon: 'ðŸŽ¬',
     title: '5,000+ Films',
     desc: 'Sourced from the TMDB dataset with enriched metadata, posters, ratings, and full cast data.',
   },
   {
-    icon: '🔖',
+    icon: 'ðŸ”–',
     title: 'Personal Watchlist',
     desc: 'Sign in to save films to your watchlist, persisted across devices with Supabase.',
   },
   {
-    icon: '🕓',
+    icon: 'ðŸ•“',
     title: 'Recently Viewed',
     desc: 'Your viewing history is tracked locally and synced to your account when signed in.',
   },
 ]
 
-const ROADMAP = [
-  { label: 'Watch provider lookup', status: 'planned' },
-  { label: 'Personalised recommendations based on your watchlist', status: 'planned' },
-  { label: 'Director & actor filmography pages', status: 'planned' },
-  { label: 'Movie detail pages', status: 'planned' },
-  { label: 'Mobile app', status: 'future' },
+const ARCH_LAYERS = [
+  {
+    label: 'Frontend',
+    colour: 'border-indigo-500/40',
+    items: [
+      'Next.js 14 â€” App Router, SSR, API routes',
+      'React 18 â€” Context API for auth & watchlist',
+      'Tailwind CSS â€” utility-first styling',
+      'Supabase JS â€” client-side auth + real-time',
+    ],
+  },
+  {
+    label: 'Backend',
+    colour: 'border-emerald-500/40',
+    items: [
+      'Python 3.11 â€” FastAPI + Uvicorn',
+      'slowapi â€” per-endpoint rate limiting',
+      'Structured JSON logging with latency',
+      'Pydantic v2 â€” request validation',
+    ],
+  },
+  {
+    label: 'ML / Search',
+    colour: 'border-amber-500/40',
+    items: [
+      'TF-IDF + cosine similarity (scikit-learn)',
+      'BM25 keyword scoring (rank-bm25)',
+      'Fuzzy matching + franchise alias expansion',
+      'Hybrid re-ranking formula',
+    ],
+  },
+  {
+    label: 'Auth & Data',
+    colour: 'border-rose-500/40',
+    items: [
+      'Supabase Auth â€” email + Google OAuth',
+      'Supabase Postgres â€” managed DB',
+      'Row-Level Security on all tables',
+      'RBAC â€” user / admin roles',
+    ],
+  },
 ]
+
+const SECURITY_ITEMS = [
+  {
+    title: 'Row-Level Security (RLS)',
+    desc: 'All Supabase tables enforce RLS policies â€” users can only access their own data at the database layer.',
+  },
+  {
+    title: 'Rate Limiting',
+    desc: 'slowapi guards every endpoint: /chat (10/min), /recommend (20/min), /search (30/min).',
+  },
+  {
+    title: 'Admin RBAC',
+    desc: 'A role column on profiles gates /admin via Next.js middleware before any page code runs.',
+  },
+  {
+    title: 'Two-Factor Authentication',
+    desc: 'Admins can enable TOTP (QR code via pyotp) or Telegram OTP (real Bot API via BotFather) as a second factor.',
+  },
+  {
+    title: 'Input Validation',
+    desc: 'Pydantic models sanitise all inputs. Queries are length-capped and whitespace-stripped server-side.',
+  },
+  {
+    title: 'Standardised Error Envelopes',
+    desc: '{ success, error: { code, message } } ensures no internal details leak to the client.',
+  },
+]
+
+const TESTING_ITEMS = [
+  {
+    label: 'pytest â€” search',
+    detail: 'tests/test_api_search.py',
+    status: 'active',
+  },
+  {
+    label: 'pytest â€” recommendations',
+    detail: 'tests/test_api_recommend.py',
+    status: 'active',
+  },
+  {
+    label: 'pytest â€” chat + admin/2FA',
+    detail: 'tests/test_api_chat.py',
+    status: 'active',
+  },
+  {
+    label: 'Playwright E2E â€” search flow',
+    detail: 'tests/e2e/search.spec.js',
+    status: 'active',
+  },
+  {
+    label: 'Playwright E2E â€” chat interface',
+    detail: 'tests/e2e/chat.spec.js',
+    status: 'active',
+  },
+  {
+    label: 'CI pipeline (GitHub Actions)',
+    detail: '.github/workflows/ci.yml',
+    status: 'active',
+  },
+]
+
+const ROADMAP = [
+  { label: 'Watch provider lookup (JustWatch API)', status: 'planned' },
+  { label: 'Personalised recommendations from watchlist ML', status: 'planned' },
+  { label: 'Director & actor filmography pages', status: 'planned' },
+  { label: 'Redis caching for hot search paths', status: 'planned' },
+  { label: 'Microservices split (search / recommendations / chat)', status: 'future' },
+  { label: 'Dedicated search infrastructure (Meilisearch / Typesense)', status: 'future' },
+  { label: 'Mobile app (React Native)', status: 'future' },
+]
+
+// â”€â”€ Components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function FeatureCard({ feature }) {
   return (
@@ -54,12 +162,39 @@ function FeatureCard({ feature }) {
   )
 }
 
+function ArchCard({ layer }) {
+  return (
+    <div className={`p-4 rounded-xl bg-surface-elevated border ${layer.colour}`}>
+      <p className="font-semibold text-text-primary mb-3 text-sm">{layer.label}</p>
+      <ul className="space-y-1.5">
+        {layer.items.map((item) => (
+          <li key={item} className="text-xs text-text-secondary flex gap-2">
+            <span className="text-text-muted mt-0.5">â€º</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function SecurityCard({ item }) {
+  return (
+    <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
+      <p className="text-sm font-semibold text-text-primary mb-1">{item.title}</p>
+      <p className="text-xs text-text-secondary leading-relaxed">{item.desc}</p>
+    </div>
+  )
+}
+
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 export default function AboutPage() {
   return (
-    <div className="space-y-12 max-w-3xl">
+    <div className="space-y-14 max-w-3xl">
       <PageHero
         title="About CineMatch"
-        subtitle="A portfolio-grade movie discovery engine built with modern web technology and real AI/ML backends."
+        subtitle="A portfolio-grade movie discovery platform â€” semantic search, hybrid ML recommendations, and an AI chat assistant, built on a production-hardened full-stack architecture."
       />
 
       {/* What it is */}
@@ -67,25 +202,30 @@ export default function AboutPage() {
         <h2 className="text-lg font-semibold text-text-primary mb-4">What is CineMatch?</h2>
         <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
           <p>
-            CineMatch is a full-stack movie recommendation platform demonstrating how semantic search,
-            machine learning recommendation engines, and modern web architecture work together
-            as a real product.
+            CineMatch is a full-stack movie recommendation platform demonstrating how semantic
+            search, machine learning recommendation engines, and modern web architecture work
+            together as a real product â€” not a tutorial project.
           </p>
           <p>
-            The recommendation engine uses a <strong className="text-text-primary">hybrid cosine similarity + BM25</strong> approach
+            The recommendation engine uses a{' '}
+            <strong className="text-text-primary">hybrid cosine similarity + BM25</strong> approach
             trained on metadata, genres, cast, and directors from 5,000 TMDB films. The semantic
-            search pipeline combines <strong className="text-text-primary">TF-IDF, BM25, fuzzy matching, and franchise alias expansion</strong> to
-            understand natural language queries.
+            search pipeline combines{' '}
+            <strong className="text-text-primary">
+              TF-IDF, BM25, fuzzy matching, and franchise alias expansion
+            </strong>{' '}
+            to understand natural language queries.
           </p>
           <p>
-            Authentication and user data (watchlist, recently viewed) are powered by{' '}
-            <strong className="text-text-primary">Supabase</strong>.
-            The AI chat assistant runs on <strong className="text-text-primary">Groq LLM (Llama 3.1)</strong>.
+            Authentication, user data, and role management are powered by{' '}
+            <strong className="text-text-primary">Supabase</strong>. The AI chat assistant runs on{' '}
+            <strong className="text-text-primary">Groq LLM (Llama 3.1)</strong>, grounded to the
+            dataset for accurate suggestions.
           </p>
         </div>
       </section>
 
-      {/* Features grid */}
+      {/* Features */}
       <section>
         <h2 className="text-lg font-semibold text-text-primary mb-4">Features</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -95,45 +235,103 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Stack */}
+      {/* Architecture */}
       <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Technology stack</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-2">Architecture overview</h2>
+        <p className="text-xs text-text-muted mb-4">
+          Next.js â†’ FastAPI â†’ Supabase Postgres â€” each layer decoupled and independently deployable.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          {ARCH_LAYERS.map((layer) => (
+            <ArchCard key={layer.label} layer={layer} />
+          ))}
+        </div>
+      </section>
+
+      {/* Recommendation engine detail */}
+      <section>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Recommendation engine</h2>
+        <div className="p-5 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)] space-y-3 text-sm text-text-secondary leading-relaxed">
+          <p>
+            The engine computes a{' '}
+            <strong className="text-text-primary">weighted hybrid score</strong> for every candidate
+            film:
+          </p>
+          <ul className="space-y-1.5 text-xs">
+            <li className="flex gap-2">
+              <span className="text-indigo-400 font-mono shrink-0">TF-IDF</span>
+              Vectorises plot overviews and computes cosine similarity across the corpus.
+            </li>
+            <li className="flex gap-2">
+              <span className="text-emerald-400 font-mono shrink-0">BM25</span>
+              Probabilistic keyword relevance on title, genre, and cast tokens.
+            </li>
+            <li className="flex gap-2">
+              <span className="text-amber-400 font-mono shrink-0">Fuzzy</span>
+              Tolerates typos and alternate spellings via token-set-ratio matching.
+            </li>
+            <li className="flex gap-2">
+              <span className="text-rose-400 font-mono shrink-0">Quality</span>
+              Vote count and average rating signals boost popular consensus picks.
+            </li>
+          </ul>
+          <p>
+            Results are re-ranked by genre overlap and franchise membership before the final
+            top-N are returned to the client.
+          </p>
+        </div>
+      </section>
+
+      {/* Security */}
+      <section>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Security</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {SECURITY_ITEMS.map((item) => (
+            <SecurityCard key={item.title} item={item} />
+          ))}
+        </div>
+      </section>
+
+      {/* Testing & CI */}
+      <section>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Testing & CI</h2>
+        <div className="space-y-2">
+          {TESTING_ITEMS.map((item) => (
+            <div
+              key={item.label}
+              className="flex items-center gap-3 p-3 rounded-lg bg-surface-elevated border border-[rgba(255,255,255,0.05)]"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+              <span className="text-sm text-text-secondary flex-1">{item.label}</span>
+              <span className="text-[10px] font-mono text-text-muted">{item.detail}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-text-muted leading-relaxed">
+          The GitHub Actions pipeline runs pytest, builds Next.js, and executes Playwright smoke
+          tests on every push to <code className="text-text-secondary">main</code>. Any failing
+          step blocks the merge.
+        </p>
+      </section>
+
+      {/* Deployment */}
+      <section>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Deployment</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
-            <p className="font-semibold text-text-primary mb-3">Frontend</p>
+            <p className="font-semibold text-text-primary mb-3">Cloud (default)</p>
             <ul className="space-y-1.5 text-text-secondary">
-              <li>Next.js 14 (App Router)</li>
-              <li>React 18</li>
-              <li>Tailwind CSS</li>
-              <li>Supabase JS (auth + storage)</li>
+              <li>Vercel â€” Next.js frontend</li>
+              <li>Render â€” FastAPI backend</li>
+              <li>Supabase Cloud â€” DB + Auth</li>
             </ul>
           </div>
           <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
-            <p className="font-semibold text-text-primary mb-3">Backend</p>
+            <p className="font-semibold text-text-primary mb-3">Self-hosted (Docker)</p>
             <ul className="space-y-1.5 text-text-secondary">
-              <li>Python 3.11</li>
-              <li>FastAPI + Uvicorn</li>
-              <li>scikit-learn (TF-IDF, cosine similarity)</li>
-              <li>rank-bm25, thefuzz</li>
-              <li>Groq LLM API</li>
-              <li>TMDB + OMDB poster APIs</li>
-            </ul>
-          </div>
-          <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
-            <p className="font-semibold text-text-primary mb-3">Auth & Data</p>
-            <ul className="space-y-1.5 text-text-secondary">
-              <li>Supabase Auth (Google + email)</li>
-              <li>Supabase Postgres</li>
-              <li>Row-level security</li>
-            </ul>
-          </div>
-          <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
-            <p className="font-semibold text-text-primary mb-3">Deployment</p>
-            <ul className="space-y-1.5 text-text-secondary">
-              <li>Vercel (frontend)</li>
-              <li>Render (FastAPI backend)</li>
-              <li>Supabase cloud (DB + auth)</li>
-              <li>Docker-ready</li>
+              <li>Dockerfile.backend â€” multi-stage Python image</li>
+              <li>Dockerfile.frontend â€” multi-stage Node image</li>
+              <li>docker-compose.yml â€” single-command local stack</li>
             </ul>
           </div>
         </div>
@@ -141,7 +339,7 @@ export default function AboutPage() {
 
       {/* Roadmap */}
       <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Roadmap</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-4">Roadmap & future improvements</h2>
         <div className="space-y-2">
           {ROADMAP.map((item) => (
             <div
@@ -158,8 +356,8 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Support CTA */}
       <SupportCTA variant="banner" />
     </div>
   )
 }
+

@@ -8,6 +8,7 @@ import GenreFilter from '../../components/search/GenreFilter'
 import MovieGrid from '../../components/movie/MovieGrid'
 import SectionHeader from '../../components/ui/SectionHeader'
 import Button from '../../components/ui/Button'
+import EmptyState from '../../components/ui/EmptyState'
 
 export default function BrowsePage() {
   const router = useRouter()
@@ -16,8 +17,10 @@ export default function BrowsePage() {
   const [movies, setMovies] = useState([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalMovies, setTotalMovies] = useState(0)
   const [loadingGenres, setLoadingGenres] = useState(true)
   const [loadingMovies, setLoadingMovies] = useState(false)
+  const [genreError, setGenreError] = useState(false)
 
   // Load genres on mount
   useEffect(() => {
@@ -28,6 +31,7 @@ export default function BrowsePage() {
         setGenres(list)
         if (list.length > 0) setSelectedGenre(list[0])
       })
+      .catch(() => setGenreError(true))
       .finally(() => setLoadingGenres(false))
   }, [])
 
@@ -38,8 +42,10 @@ export default function BrowsePage() {
     api
       .movies(selectedGenre, page, 20)
       .then((d) => {
-        setMovies(d.movies || [])
-        const total = d.total || 0
+        // Response shape: { success, data: { movies, total, page, page_size } }
+        setMovies(d.data?.movies || [])
+        const total = d.data?.total || 0
+        setTotalMovies(total)
         setTotalPages(Math.max(1, Math.ceil(total / 20)))
       })
       .catch(() => setMovies([]))
@@ -63,24 +69,39 @@ export default function BrowsePage() {
       />
 
       {/* Genre filter */}
-      <div>
-        <p className="text-xs font-medium text-text-muted uppercase tracking-widest mb-3">
-          Genre
-        </p>
-        <GenreFilter
-          genres={genres}
-          selected={selectedGenre}
-          onSelect={handleGenreSelect}
-          loading={loadingGenres}
+      {genreError ? (
+        <EmptyState
+          icon="⚠️"
+          title="Couldn't load genres"
+          description="Failed to reach the server. Refresh the page to try again."
+          action={
+            <Button onClick={() => window.location.reload()}>Refresh</Button>
+          }
         />
-      </div>
+      ) : (
+        <div>
+          <p className="text-xs font-medium text-text-muted uppercase tracking-widest mb-3">
+            Genre
+          </p>
+          <GenreFilter
+            genres={genres}
+            selected={selectedGenre}
+            onSelect={handleGenreSelect}
+            loading={loadingGenres}
+          />
+        </div>
+      )}
 
       {/* Movies */}
-      {selectedGenre && (
+      {selectedGenre && !genreError && (
         <div>
           <SectionHeader
             title={selectedGenre}
-            subtitle={`Page ${page} of ${totalPages}`}
+            subtitle={
+              loadingMovies
+                ? `Page ${page} of ${totalPages}`
+                : `${totalMovies} film${totalMovies !== 1 ? 's' : ''} · page ${page} of ${totalPages}`
+            }
           />
           <MovieGrid
             movies={movies}

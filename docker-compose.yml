@@ -1,0 +1,60 @@
+## ── CineMatch — Docker Compose ───────────────────────────────────────────────
+## Spins up the FastAPI backend and Next.js frontend as separate services.
+##
+## Usage:
+##   cp .env.example .env                  # fill in real values
+##   docker compose up --build
+##
+## The frontend reaches the backend at http://backend:8000 inside Docker,
+## but the browser reaches it via http://localhost:8000 (mapped port).
+
+services:
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: cinematch-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # API keys — supply via .env file or CI secrets
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      OMDB_API_KEY: ${OMDB_API_KEY}
+      # Allow requests from the frontend container and localhost
+      ALLOWED_ORIGINS: "http://localhost:3000,http://frontend:3000"
+    volumes:
+      # Mount cache for poster data so it persists across restarts
+      - backend-cache:/app/cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Next.js frontend ─────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        # Inside Docker the browser still hits localhost:8000 (mapped port)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: cinematch-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+
+volumes:
+  backend-cache:
+

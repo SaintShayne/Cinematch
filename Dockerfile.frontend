@@ -1,0 +1,50 @@
+## ── CineMatch Frontend — Dockerfile ──────────────────────────────────────────
+## Standard Next.js multi-stage build.
+## next.config.js does NOT use output:'standalone', so we carry the full
+## node_modules into the runtime stage.
+
+# ── Stage 1: install & build ──────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies first (layer-cached unless package.json changes)
+COPY frontend/package*.json ./
+RUN npm ci
+
+# Copy the rest of the frontend source
+COPY frontend/ .
+
+# Build arguments for environment variables baked into the build
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+RUN npm run build
+
+
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS runtime
+
+RUN addgroup --system app && adduser --system --ingroup app app
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy only what Next.js needs to serve the app
+COPY --from=builder --chown=app:app /app/public ./public
+COPY --from=builder --chown=app:app /app/.next ./.next
+COPY --from=builder --chown=app:app /app/node_modules ./node_modules
+COPY --from=builder --chown=app:app /app/package.json ./package.json
+
+USER app
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]

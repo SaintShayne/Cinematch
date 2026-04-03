@@ -2,7 +2,6 @@ pandas
 numpy
 scikit-learn
 requests
-aiohttp
 faiss-cpu
 fastapi
 uvicorn
@@ -12,3 +11,13 @@ groq
 rank-bm25
 thefuzz
 pyspellchecker
+# Backend hardening
+slowapi
+python-multipart
+# 2FA (TOTP)
+pyotp
+qrcode[pil]
+# Testing
+pytest
+pytest-asyncio
+httpx

@@ -12,7 +12,7 @@ export default function AuthButtons({ redirectTo = '/', mode = 'signin' }) {
         redirectTo: `${window.location.origin}/auth/callback?next=${redirectTo}`,
       },
     })
-    if (error) console.error('Google auth error:', error.message)
+    if (error) console.error('Google auth failed')
   }
 
   return (
@@ -44,3 +44,4 @@ export default function AuthButtons({ redirectTo = '/', mode = 'signin' }) {
     </button>
   )
 }
+

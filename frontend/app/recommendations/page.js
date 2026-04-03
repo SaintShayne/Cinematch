@@ -8,13 +8,14 @@ import PageHero from '../../components/layout/PageHero'
 import RecommendationPanel from '../../components/movie/RecommendationPanel'
 import SectionHeader from '../../components/ui/SectionHeader'
 import EmptyState from '../../components/ui/EmptyState'
+import Button from '../../components/ui/Button'
 import { cn, formatYear, formatRating } from '../../lib/utils'
 
 /**
  * Inline autocomplete for movie title lookup.
  * Queries /search on each keystroke (≥2 chars), shows dropdown, calls onSelect when confirmed.
  */
-function MovieSearchInput({ onSelect, initialValue = '', loading: recLoading }) {
+function MovieSearchInput({ onSelect, initialValue = '' }) {
   const [query, setQuery] = useState(initialValue)
   const [suggestions, setSuggestions] = useState([])
   const [open, setOpen] = useState(false)
@@ -162,13 +163,18 @@ function RecommendationsContent() {
     }
   }, [])
 
-  // Auto-fetch if movie is in URL
+  // Auto-fetch if movie is in URL.
+  // DEF-002: `count` is intentionally excluded from deps — this effect fires
+  // once per unique initialMovie (URL param change). Count-change fetches are
+  // handled exclusively by handleCountChange; including count here would fire
+  // two API calls every time the user changes the result count.
   useEffect(() => {
     if (initialMovie) {
       setMovieTitle(initialMovie)
-      fetchRecs(initialMovie, count)
+      fetchRecs(initialMovie, 10)
     }
-  }, [initialMovie, count, fetchRecs])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMovie, fetchRecs])
 
   const handleSelect = (title) => {
     setMovieTitle(title)
@@ -207,7 +213,6 @@ function RecommendationsContent() {
         <MovieSearchInput
           onSelect={handleSelect}
           initialValue={movieTitle}
-          loading={loading}
         />
       </div>
 
@@ -239,6 +244,11 @@ function RecommendationsContent() {
           icon="🔍"
           title="No results"
           description={error}
+          action={
+            <Button variant="secondary" onClick={() => fetchRecs(movieTitle, count)}>
+              Try again
+            </Button>
+          }
         />
       ) : movieTitle ? (
         <div>

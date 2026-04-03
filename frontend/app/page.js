@@ -12,12 +12,14 @@ import { TECH_STACK } from '../lib/constants'
 
 function StatsBar({ stats }) {
   if (!stats) return null
+
   const items = [
     { label: 'Films', value: stats.total_movies?.toLocaleString() },
     { label: 'Genres', value: stats.total_genres },
     { label: 'Search modes', value: stats.search_types ?? 2 },
     { label: 'Engine', value: 'Hybrid AI' },
   ]
+
   return (
     <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
       {items.map((item) => (
@@ -33,43 +35,37 @@ function StatsBar({ stats }) {
 function SearchPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialQuery = searchParams.get('q') || ''
+  const urlQuery = searchParams.get('q') || ''
 
-  const [query, setQuery] = useState(initialQuery)
-  const [mode, setMode] = useState('smart') // 'smart' | 'title'
+  const [query, setQuery] = useState(urlQuery)
+  const [mode, setMode] = useState('smart')
   const [results, setResults] = useState([])
   const [trending, setTrending] = useState([])
   const [stats, setStats] = useState(null)
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState(false)
   const [loadingTrending, setLoadingTrending] = useState(true)
-  const [activeQuery, setActiveQuery] = useState(initialQuery)
-
-  // Load initial data
-  useEffect(() => {
-    Promise.all([
-      api.trending(20).then((d) => setTrending(d.movies || [])),
-      api.stats().then(setStats),
-    ]).finally(() => setLoadingTrending(false))
-  }, [])
-
-  // If URL has ?q= on mount, run that search
-  useEffect(() => {
-    if (initialQuery) runSearch(initialQuery)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const [activeQuery, setActiveQuery] = useState(urlQuery)
 
   const runSearch = useCallback(
-    async (q) => {
-      if (!q.trim()) return
+    async (q, selectedMode = mode) => {
+      const trimmed = q.trim()
+      if (!trimmed) return
+
       setSearching(true)
-      setActiveQuery(q)
+      setSearchError(false)
+      setActiveQuery(trimmed)
+
       try {
         const data =
-          mode === 'smart'
-            ? await api.semanticSearch(q, 20)
-            : await api.search(q, 20)
+          selectedMode === 'smart'
+            ? await api.semanticSearch(trimmed, 20)
+            : await api.search(trimmed, 20)
+
         setResults(data.results || [])
       } catch {
         setResults([])
+        setSearchError(true)
       } finally {
         setSearching(false)
       }
@@ -77,25 +73,52 @@ function SearchPageContent() {
     [mode]
   )
 
-  const handleSearch = (q) => {
-    setQuery(q)
-    runSearch(q)
-  }
+  useEffect(() => {
+    Promise.all([
+      api.trending(20).then((d) => setTrending(d.data?.movies || [])),
+      api.stats().then((d) => setStats(d.stats)),
+    ]).finally(() => setLoadingTrending(false))
+  }, [])
 
-  const handleMoodSelect = (q) => {
-    setQuery(q)
-    runSearch(q)
+  useEffect(() => {
+    const trimmed = urlQuery.trim()
+
+    setQuery(urlQuery)
+
+    if (!trimmed) {
+      setActiveQuery('')
+      setResults([])
+      setSearchError(false)
+      setSearching(false)
+      return
+    }
+
+    setMode('smart')
+    runSearch(trimmed, 'smart')
+  }, [urlQuery, runSearch])
+
+  // Re-run the search when the user switches between Smart / Title mode
+  // (activeQuery is intentionally omitted from deps — handled by the URL effect above)
+  useEffect(() => {
+    if (!activeQuery) return
+    runSearch(activeQuery, mode)
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Both the search bar submit and mood-chip clicks navigate to the same URL shape
+  const navigateToQuery = (q) => {
+    const trimmed = q.trim()
+    if (!trimmed) return
+    router.push(`/?q=${encodeURIComponent(trimmed)}`)
   }
 
   const handleMovieSelect = (movie) => {
     router.push(`/recommendations?movie=${encodeURIComponent(movie.title)}`)
   }
 
-  const showResults = activeQuery && !searching
+  const showResults = !!activeQuery && !searching
 
   return (
     <div className="space-y-8">
-      {/* Hero */}
       <div className="relative pt-4">
         <div
           aria-hidden
@@ -115,33 +138,39 @@ function SearchPageContent() {
         </div>
       </div>
 
-      {/* Search */}
       <div className="space-y-3">
         <SearchBar
           value={query}
           onChange={setQuery}
-          onSubmit={handleSearch}
+          onSubmit={navigateToQuery}
           mode={mode}
           onModeChange={setMode}
           loading={searching}
           autoFocus
         />
-        <MoodFilters onSelect={handleMoodSelect} activeQuery={activeQuery} />
+        <MoodFilters onSelect={navigateToQuery} activeQuery={activeQuery} />
       </div>
 
-      {/* Results or Trending */}
       {showResults ? (
         <div>
           <SectionHeader
             title={`Results for "${activeQuery}"`}
-            subtitle={`${results.length} film${results.length !== 1 ? 's' : ''} found`}
+            subtitle={
+              searchError
+                ? 'Search failed — check your connection and try again'
+                : `${results.length} film${results.length !== 1 ? 's' : ''} found`
+            }
           />
           <MovieGrid
             movies={results}
             loading={searching}
             onSelect={handleMovieSelect}
-            emptyTitle="No results found"
-            emptyDescription="Try different keywords or switch to Title Search."
+            emptyTitle={searchError ? 'Search unavailable' : 'No results found'}
+            emptyDescription={
+              searchError
+                ? 'Could not reach the search service. Try again in a moment.'
+                : 'Try different keywords or switch to Title Search.'
+            }
           />
         </div>
       ) : (
@@ -158,14 +187,15 @@ function SearchPageContent() {
         </div>
       )}
 
-      {/* Tech stack */}
       <div className="pt-4 border-t border-[rgba(255,255,255,0.06)]">
         <p className="text-2xs text-text-muted mb-3 uppercase tracking-widest font-medium">
           Powered by
         </p>
         <div className="flex flex-wrap gap-2">
           {TECH_STACK.map((tech) => (
-            <Badge key={tech} variant="tech">{tech}</Badge>
+            <Badge key={tech} variant="tech">
+              {tech}
+            </Badge>
           ))}
         </div>
       </div>

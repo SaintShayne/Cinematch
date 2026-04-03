@@ -5,7 +5,7 @@ import { createClient } from '../supabase/client'
 import { useAuth } from './AuthContext'
 
 /**
- * WatchlistContext — single source of truth for the user's watchlist.
+ * WatchlistContext â€” single source of truth for the user's watchlist.
  *
  * Placed above AppShell so every component (MovieCard, SidebarNav,
  * watchlist page, RecommendationPanel) shares the same state.
@@ -33,7 +33,7 @@ export function WatchlistProvider({ children }) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('[WatchlistContext] fetch error:', error.message)
+      console.error('[WatchlistContext] fetch error')
     } else {
       setWatchlist(data || [])
     }
@@ -48,7 +48,7 @@ export function WatchlistProvider({ children }) {
     async (movie) => {
       if (!user) return false
 
-      // Use title as the stable movie_id — our API doesn't return numeric IDs
+      // Use title as the stable movie_id â€” our API doesn't return numeric IDs
       const movieId = movie.title
 
       const { error } = await supabase.from('watchlists').insert({
@@ -59,9 +59,9 @@ export function WatchlistProvider({ children }) {
       })
 
       if (error) {
-        // Unique constraint hit means it's already saved — treat as success
+        // Unique constraint hit means it's already saved â€” treat as success
         if (error.code === '23505') return true
-        console.error('[WatchlistContext] insert error:', error.message)
+        console.error('[WatchlistContext] insert error')
         return false
       }
 
@@ -94,7 +94,7 @@ export function WatchlistProvider({ children }) {
         .eq('movie_id', String(movieId))
 
       if (error) {
-        console.error('[WatchlistContext] delete error:', error.message)
+        console.error('[WatchlistContext] delete error')
         return false
       }
 
@@ -135,3 +135,4 @@ export function useWatchlist() {
   if (!ctx) throw new Error('useWatchlist must be used inside <WatchlistProvider>')
   return ctx
 }
+

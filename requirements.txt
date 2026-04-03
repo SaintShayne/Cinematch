@@ -1,0 +1,14 @@
+pandas
+numpy
+scikit-learn
+requests
+aiohttp
+faiss-cpu
+fastapi
+uvicorn
+joblib
+python-dotenv
+groq
+rank-bm25
+thefuzz
+pyspellchecker

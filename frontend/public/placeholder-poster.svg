@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" fill="none">
+  <rect width="200" height="300" fill="#16171c"/>
+  <rect x="1" y="1" width="198" height="298" rx="1" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <svg x="76" y="120" width="48" height="48" viewBox="0 0 24 24" fill="rgba(255,255,255,0.12)">
+    <path d="M2 6a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+  </svg>
+  <text x="100" y="195" font-family="system-ui,sans-serif" font-size="10" fill="rgba(255,255,255,0.2)" text-anchor="middle">No poster</text>
+</svg>

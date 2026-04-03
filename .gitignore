@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache / generated artifacts (large, not for repo)
+cache/
+data/cache/
+
+# Large datasets (use git-lfs or external storage)
+data/raw/
+data/*.csv
+*.csv
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/.env.local
+
+# Temp / junk
+*.tmp.*
+*.tmp
+*.bak

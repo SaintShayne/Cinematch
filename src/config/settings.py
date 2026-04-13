@@ -47,7 +47,7 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # -------------------------------
-# OMDB SETTINGS  (free key at omdbapi.com â€” 1 000 req/day)
+# OMDB SETTINGS  (free key at omdbapi.com — 1 000 req/day)
 # -------------------------------
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"

@@ -36,15 +36,15 @@ from src.services.recommendation_service import RecommendationService
 from src.config.settings import MOVIES_CSV, CREDITS_CSV
 from src.utils.logger import get_logger, RequestTimer
 
-# â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Logging ──────────────────────────────────────────────────────────────────
 
 logger = get_logger("cinematch.api")
 
-# â”€â”€ Rate limiter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Rate limiter ──────────────────────────────────────────────────────────────
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
-# â”€â”€ App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="CineMatch API",
@@ -58,7 +58,7 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# â”€â”€ CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── CORS ──────────────────────────────────────────────────────────────────────
 
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = (
@@ -74,7 +74,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-# â”€â”€ Middleware: request logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Middleware: request logging ───────────────────────────────────────────────
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -93,11 +93,11 @@ async def log_requests(request: Request, call_next):
     )
     return response
 
-# â”€â”€ Service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Service ───────────────────────────────────────────────────────────────────
 
 service = RecommendationService(MOVIES_CSV, CREDITS_CSV)
 
-# â”€â”€ In-memory store (DEV ONLY) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── In-memory store (DEV ONLY) ────────────────────────────────────────────────
 # Stores:  { user_id: { secret, enable_2fa, auth_method } }
 # In production this should be replaced with the Supabase admin_settings table.
 _admin_2fa_store: dict[str, dict] = {}
@@ -115,7 +115,7 @@ _feature_flags = {
     "enable_recommendations": True,
 }
 
-# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _error(code: str, message: str, status: int = 400) -> JSONResponse:
     """Return a standardised error envelope."""
@@ -145,7 +145,7 @@ def _sanitise(text: str, max_len: int = MAX_QUERY_LENGTH) -> str:
     return text
 
 
-# â”€â”€ DEV-ONLY admin bootstrap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── DEV-ONLY admin bootstrap ──────────────────────────────────────────────────
 # WARNING: Hardcoded credentials for local development ONLY.
 # Remove or gate behind an environment check before production deployment.
 _DEV_ADMIN_USERNAME = "admin"
@@ -153,11 +153,11 @@ _DEV_ADMIN_PASSWORD = "admin"  # noqa: S105  # DEV ONLY
 
 
 def _is_dev_admin(username: str, password: str) -> bool:
-    """DEV ONLY â€” authenticate the hardcoded fallback admin account."""
+    """DEV ONLY — authenticate the hardcoded fallback admin account."""
     return username == _DEV_ADMIN_USERNAME and password == _DEV_ADMIN_PASSWORD
 
 
-# â”€â”€ Chat helpers (unchanged from v3) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Chat helpers (unchanged from v3) ──────────────────────────────────────────
 
 def _find_seed_movie(message: str) -> str | None:
     pattern = (
@@ -211,7 +211,7 @@ def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -
     return []
 
 
-# â”€â”€ Pydantic models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Pydantic models ───────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     messages: list[dict[str, str]] = []
@@ -268,7 +268,7 @@ class RoleUpdateRequest(BaseModel):
     role: str  # 'admin' | 'user'
 
 
-# â”€â”€ System endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── System endpoints ──────────────────────────────────────────────────────────
 
 @app.get("/", tags=["System"])
 def root():
@@ -285,7 +285,7 @@ def get_stats():
     return _ok({"stats": service.get_stats()})
 
 
-# â”€â”€ Browse endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Browse endpoints ──────────────────────────────────────────────────────────
 
 @app.get("/genres", tags=["Browse"])
 def get_genres():
@@ -318,7 +318,7 @@ def get_trending(limit: int = Query(20, ge=1, le=50)):
     return _ok({"data": service.get_trending(limit)})
 
 
-# â”€â”€ Search endpoints (rate-limited) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Search endpoints (rate-limited) ──────────────────────────────────────────
 
 @app.get("/search", tags=["Search"])
 @limiter.limit("30/minute")
@@ -346,7 +346,7 @@ def semantic_search_movies(
     return _ok({"query": query, "count": len(results), "results": results})
 
 
-# â”€â”€ Recommendations endpoint (rate-limited) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Recommendations endpoint (rate-limited) ───────────────────────────────────
 
 @app.get("/recommend", tags=["Recommendations"])
 @limiter.limit("20/minute")
@@ -368,7 +368,7 @@ def recommend(
     })
 
 
-# â”€â”€ Chat endpoint (rate-limited) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Chat endpoint (rate-limited) ─────────────────────────────────────────────
 
 @app.post("/chat", tags=["Chat"])
 @limiter.limit("10/minute")
@@ -403,30 +403,30 @@ def chat(request: Request, body: ChatRequest):
         return _error("SERVICE_ERROR", f"CineMatch unavailable: {e}", 503)
 
 
-# â”€â”€ Admin: login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: login ──────────────────────────────────────────────────────────────
 # DEV ONLY: the hardcoded admin/admin bypass is intentional for local development.
 # In production, replace this with a proper Supabase session check.
 
 @app.post("/admin/login", tags=["Admin"])
 def admin_login(body: AdminLoginRequest):
     """
-    DEV ONLY â€” Authenticate with the hardcoded admin account.
-    Returns a synthetic session token (not a real JWT â€” use Supabase auth in prod).
+    DEV ONLY — Authenticate with the hardcoded admin account.
+    Returns a synthetic session token (not a real JWT — use Supabase auth in prod).
     """
     if not _is_dev_admin(body.username, body.password):
         return _error("UNAUTHORIZED", "Invalid credentials", 401)
 
-    # Synthetic dev token â€” replace with Supabase JWT verification in production
+    # Synthetic dev token — replace with Supabase JWT verification in production
     dev_token = secrets.token_urlsafe(32)
     logger.info("admin login (DEV)", extra={"username": body.username})
     return _ok({
         "role": "admin",
         "token": dev_token,
-        "warning": "DEV ONLY â€” use Supabase auth in production",
+        "warning": "DEV ONLY — use Supabase auth in production",
     })
 
 
-# â”€â”€ Admin: stats & user management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: stats & user management ───────────────────────────────────────────
 
 @app.get("/admin/stats", tags=["Admin"])
 def admin_stats():
@@ -456,7 +456,7 @@ def set_feature_flag(body: FeatureFlagRequest):
     return _ok({"flag": body.flag, "enabled": body.enabled})
 
 
-# â”€â”€ Admin: 2FA â€” TOTP setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: 2FA — TOTP setup ───────────────────────────────────────────────────
 
 @app.post("/admin/2fa/setup", tags=["Admin 2FA"])
 def setup_2fa(body: TwoFASetupRequest):
@@ -481,7 +481,7 @@ def setup_2fa(body: TwoFASetupRequest):
     img.save(buf, format="PNG")
     qr_b64 = base64.b64encode(buf.getvalue()).decode()
 
-    # Store in memory (DEV ONLY â€” use Supabase admin_settings in production)
+    # Store in memory (DEV ONLY — use Supabase admin_settings in production)
     _admin_2fa_store[body.user_id] = {
         "secret": secret,
         "enable_2fa": False,   # enabled only after successful verification
@@ -491,7 +491,7 @@ def setup_2fa(body: TwoFASetupRequest):
     logger.info("2fa setup initiated", extra={"user_id": body.user_id})
     return _ok({
         "secret": secret,
-        "qr_code": qr_b64,      # base64 PNG â€” render as <img src="data:image/png;base64,...">
+        "qr_code": qr_b64,      # base64 PNG — render as <img src="data:image/png;base64,...">
         "provisioning_uri": provisioning_uri,
     })
 
@@ -514,14 +514,14 @@ def verify_2fa(body: TwoFAVerifyRequest):
     return _ok({"message": "2FA enabled successfully"})
 
 
-# â”€â”€ Admin: 2FA â€” Telegram bot config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: 2FA — Telegram bot config ─────────────────────────────────────────
 
 @app.post("/admin/2fa/telegram/config", tags=["Admin 2FA"])
 def save_telegram_config(body: TelegramConfigRequest):
     """
     Save the Telegram bot token and target chat ID for a user.
     The bot token is stored as-is in memory (dev only); use encrypted storage
-    in production.  A test message is NOT sent here â€” use /send to verify.
+    in production.  A test message is NOT sent here — use /send to verify.
     """
     _telegram_config_store[body.user_id] = {
         "bot_token": body.bot_token.strip(),
@@ -547,25 +547,25 @@ def get_telegram_config(user_id: str):
     })
 
 
-# â”€â”€ Admin: 2FA â€” Telegram OTP (real Bot API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: 2FA — Telegram OTP (real Bot API) ─────────────────────────────────
 
 def _send_telegram_otp(user_id: str, code: str):
     """
     Send a 6-digit OTP to the configured Telegram chat via the Bot API.
 
     Returns:
-        True        â€” message delivered successfully
-        str         â€” human-readable error description (caller surfaces to the client)
+        True        — message delivered successfully
+        str         — human-readable error description (caller surfaces to the client)
     """
     cfg = _telegram_config_store.get(user_id)
     if not cfg or not cfg.get("bot_token") or not cfg.get("chat_id"):
-        msg = "No Telegram bot config found â€” save your bot token and chat ID first."
+        msg = "No Telegram bot config found — save your bot token and chat ID first."
         logger.error("telegram config missing", extra={"user_id": user_id})
         return msg
 
     url  = f"https://api.telegram.org/bot{cfg['bot_token']}/sendMessage"
     text = (
-        "ðŸ” <b>CineMatch admin 2FA code</b>\n\n"
+        "🔐 <b>CineMatch admin 2FA code</b>\n\n"
         f"<code>{code}</code>\n\n"
         "Valid for 2 minutes. Do not share this code."
     )
@@ -587,7 +587,7 @@ def _send_telegram_otp(user_id: str, code: str):
         logger.error("telegram send failed", extra={"user_id": user_id, "error": detail})
         return f"Telegram API error: {detail}"
     except _http.exceptions.Timeout:
-        msg = "Telegram API timed out â€” check your network and try again."
+        msg = "Telegram API timed out — check your network and try again."
         logger.error("telegram send timeout", extra={"user_id": user_id})
         return msg
     except Exception as exc:
@@ -606,7 +606,7 @@ def telegram_send_otp(body: TelegramOTPRequest):
     if body.user_id not in _telegram_config_store:
         return _error(
             "CONFIG_MISSING",
-            "No Telegram bot config found â€” save your bot token and chat ID first.",
+            "No Telegram bot config found — save your bot token and chat ID first.",
             400,
         )
 
@@ -622,7 +622,7 @@ def telegram_send_otp(body: TelegramOTPRequest):
         # code they'll never receive.
         del _telegram_otp_store[body.user_id]
         detail = tg_error if isinstance(tg_error, str) else (
-            "Could not deliver the OTP via Telegram â€” "
+            "Could not deliver the OTP via Telegram — "
             "check your bot token and chat ID, then try again."
         )
         return _error("SEND_FAILED", detail, 502)
@@ -649,10 +649,10 @@ def telegram_verify_otp(body: TelegramOTPVerifyRequest):
         "auth_method": "telegram",
     }
     logger.info("telegram 2fa enabled", extra={"user_id": body.user_id})
-    return _ok({"message": "Telegram OTP verified â€” 2FA enabled successfully"})
+    return _ok({"message": "Telegram OTP verified — 2FA enabled successfully"})
 
 
-# â”€â”€ Admin: 2FA â€” status & disable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: 2FA — status & disable ────────────────────────────────────────────
 
 @app.get("/admin/2fa/status/{user_id}", tags=["Admin 2FA"])
 def get_2fa_status(user_id: str):
@@ -672,7 +672,7 @@ def disable_2fa(body: TwoFASetupRequest):
     return _ok({"message": "2FA disabled"})
 
 
-# â”€â”€ Admin: logs viewer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Admin: logs viewer ────────────────────────────────────────────────────────
 # In production, tail a real log file or query your log aggregator API.
 
 _in_memory_log_buffer: list[dict] = []

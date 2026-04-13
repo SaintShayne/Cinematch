@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Install dependencies first (layer-cached unless package.json changes)
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy the rest of the frontend source
 COPY frontend/ .
@@ -48,3 +48,4 @@ USER app
 EXPOSE 3000
 
 CMD ["npm", "run", "start"]
+

@@ -2,36 +2,36 @@ import PageHero from '../../components/layout/PageHero'
 import Badge from '../../components/ui/Badge'
 import SupportCTA from '../../components/support/SupportCTA'
 
-// â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Data ──────────────────────────────────────────────────────────────────────
 
 const FEATURES = [
   {
-    icon: 'ðŸ”',
+    icon: '🔍',
     title: 'Semantic Search',
-    desc: 'Describe a vibe, emotion, or plot â€” the engine understands natural language and finds the right film.',
+    desc: 'Describe a vibe, emotion, or plot — the engine understands natural language and finds the right film.',
   },
   {
-    icon: 'âœ¨',
+    icon: '✨',
     title: 'Hybrid Recommendations',
     desc: 'Custom scoring formula combining content similarity, genre overlap, cast, and quality signals.',
   },
   {
-    icon: 'ðŸ¤–',
+    icon: '🤖',
     title: 'AI Chat',
-    desc: 'Chat with CineMatch â€” ask for recommendations, trivia, or explore genres through conversation.',
+    desc: 'Chat with CineMatch — ask for recommendations, trivia, or explore genres through conversation.',
   },
   {
-    icon: 'ðŸŽ¬',
+    icon: '🎬',
     title: '5,000+ Films',
     desc: 'Sourced from the TMDB dataset with enriched metadata, posters, ratings, and full cast data.',
   },
   {
-    icon: 'ðŸ”–',
+    icon: '🔖',
     title: 'Personal Watchlist',
     desc: 'Sign in to save films to your watchlist, persisted across devices with Supabase.',
   },
   {
-    icon: 'ðŸ•“',
+    icon: '🕓',
     title: 'Recently Viewed',
     desc: 'Your viewing history is tracked locally and synced to your account when signed in.',
   },
@@ -42,20 +42,20 @@ const ARCH_LAYERS = [
     label: 'Frontend',
     colour: 'border-indigo-500/40',
     items: [
-      'Next.js 14 â€” App Router, SSR, API routes',
-      'React 18 â€” Context API for auth & watchlist',
-      'Tailwind CSS â€” utility-first styling',
-      'Supabase JS â€” client-side auth + real-time',
+      'Next.js 14 — App Router, SSR, API routes',
+      'React 18 — Context API for auth & watchlist',
+      'Tailwind CSS — utility-first styling',
+      'Supabase JS — client-side auth + real-time',
     ],
   },
   {
     label: 'Backend',
     colour: 'border-emerald-500/40',
     items: [
-      'Python 3.11 â€” FastAPI + Uvicorn',
-      'slowapi â€” per-endpoint rate limiting',
+      'Python 3.11 — FastAPI + Uvicorn',
+      'slowapi — per-endpoint rate limiting',
       'Structured JSON logging with latency',
-      'Pydantic v2 â€” request validation',
+      'Pydantic v2 — request validation',
     ],
   },
   {
@@ -72,10 +72,10 @@ const ARCH_LAYERS = [
     label: 'Auth & Data',
     colour: 'border-rose-500/40',
     items: [
-      'Supabase Auth â€” email + Google OAuth',
-      'Supabase Postgres â€” managed DB',
+      'Supabase Auth — email + Google OAuth',
+      'Supabase Postgres — managed DB',
       'Row-Level Security on all tables',
-      'RBAC â€” user / admin roles',
+      'RBAC — user / admin roles',
     ],
   },
 ]
@@ -83,7 +83,7 @@ const ARCH_LAYERS = [
 const SECURITY_ITEMS = [
   {
     title: 'Row-Level Security (RLS)',
-    desc: 'All Supabase tables enforce RLS policies â€” users can only access their own data at the database layer.',
+    desc: 'All Supabase tables enforce RLS policies — users can only access their own data at the database layer.',
   },
   {
     title: 'Rate Limiting',
@@ -109,27 +109,27 @@ const SECURITY_ITEMS = [
 
 const TESTING_ITEMS = [
   {
-    label: 'pytest â€” search',
+    label: 'pytest — search',
     detail: 'tests/test_api_search.py',
     status: 'active',
   },
   {
-    label: 'pytest â€” recommendations',
+    label: 'pytest — recommendations',
     detail: 'tests/test_api_recommend.py',
     status: 'active',
   },
   {
-    label: 'pytest â€” chat + admin/2FA',
+    label: 'pytest — chat + admin/2FA',
     detail: 'tests/test_api_chat.py',
     status: 'active',
   },
   {
-    label: 'Playwright E2E â€” search flow',
+    label: 'Playwright E2E — search flow',
     detail: 'tests/e2e/search.spec.js',
     status: 'active',
   },
   {
-    label: 'Playwright E2E â€” chat interface',
+    label: 'Playwright E2E — chat interface',
     detail: 'tests/e2e/chat.spec.js',
     status: 'active',
   },
@@ -150,7 +150,7 @@ const ROADMAP = [
   { label: 'Mobile app (React Native)', status: 'future' },
 ]
 
-// â”€â”€ Components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Components ────────────────────────────────────────────────────────────────
 
 function FeatureCard({ feature }) {
   return (
@@ -169,7 +169,7 @@ function ArchCard({ layer }) {
       <ul className="space-y-1.5">
         {layer.items.map((item) => (
           <li key={item} className="text-xs text-text-secondary flex gap-2">
-            <span className="text-text-muted mt-0.5">â€º</span>
+            <span className="text-text-muted mt-0.5">›</span>
             {item}
           </li>
         ))}
@@ -187,14 +187,14 @@ function SecurityCard({ item }) {
   )
 }
 
-// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AboutPage() {
   return (
     <div className="space-y-14 max-w-3xl">
       <PageHero
         title="About CineMatch"
-        subtitle="A portfolio-grade movie discovery platform â€” semantic search, hybrid ML recommendations, and an AI chat assistant, built on a production-hardened full-stack architecture."
+        subtitle="A portfolio-grade movie discovery platform — semantic search, hybrid ML recommendations, and an AI chat assistant, built on a production-hardened full-stack architecture."
       />
 
       {/* What it is */}
@@ -204,7 +204,7 @@ export default function AboutPage() {
           <p>
             CineMatch is a full-stack movie recommendation platform demonstrating how semantic
             search, machine learning recommendation engines, and modern web architecture work
-            together as a real product â€” not a tutorial project.
+            together as a real product — not a tutorial project.
           </p>
           <p>
             The recommendation engine uses a{' '}
@@ -239,7 +239,7 @@ export default function AboutPage() {
       <section>
         <h2 className="text-lg font-semibold text-text-primary mb-2">Architecture overview</h2>
         <p className="text-xs text-text-muted mb-4">
-          Next.js â†’ FastAPI â†’ Supabase Postgres â€” each layer decoupled and independently deployable.
+          Next.js → FastAPI → Supabase Postgres — each layer decoupled and independently deployable.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           {ARCH_LAYERS.map((layer) => (
@@ -321,17 +321,17 @@ export default function AboutPage() {
           <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
             <p className="font-semibold text-text-primary mb-3">Cloud (default)</p>
             <ul className="space-y-1.5 text-text-secondary">
-              <li>Vercel â€” Next.js frontend</li>
-              <li>Render â€” FastAPI backend</li>
-              <li>Supabase Cloud â€” DB + Auth</li>
+              <li>Vercel — Next.js frontend</li>
+              <li>Render — FastAPI backend</li>
+              <li>Supabase Cloud — DB + Auth</li>
             </ul>
           </div>
           <div className="p-4 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)]">
             <p className="font-semibold text-text-primary mb-3">Self-hosted (Docker)</p>
             <ul className="space-y-1.5 text-text-secondary">
-              <li>Dockerfile.backend â€” multi-stage Python image</li>
-              <li>Dockerfile.frontend â€” multi-stage Node image</li>
-              <li>docker-compose.yml â€” single-command local stack</li>
+              <li>Dockerfile.backend — multi-stage Python image</li>
+              <li>Dockerfile.frontend — multi-stage Node image</li>
+              <li>docker-compose.yml — single-command local stack</li>
             </ul>
           </div>
         </div>

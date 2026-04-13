@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/utils'
+import RecentSearches from './RecentSearches'
 
 export default function SearchBar({
   value,
@@ -12,13 +13,31 @@ export default function SearchBar({
   placeholder,
   loading,
   autoFocus,
+  recentSearches = [],
+  onRecentSelect,
+  onRecentClear,
+  onRecentRemove,
+  onViewHistory,
 }) {
   const inputRef = useRef(null)
+  const containerRef = useRef(null)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!value.trim()) return
     onSubmit?.(value.trim())
+    setDropdownOpen(false)
   }
 
   const handleKeyDown = (e) => {
@@ -47,7 +66,7 @@ export default function SearchBar({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
+      <form ref={containerRef} onSubmit={handleSubmit} className="relative flex items-start gap-2">
         <div className="relative flex-1">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -64,6 +83,7 @@ export default function SearchBar({
             value={value}
             onChange={(e) => onChange?.(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={() => setDropdownOpen(true)}
             placeholder={
               placeholder ||
               (mode === 'smart'
@@ -79,6 +99,25 @@ export default function SearchBar({
               'shadow-card'
             )}
           />
+
+          {dropdownOpen && (
+            <RecentSearches
+              items={recentSearches}
+              onSelect={(item) => {
+                onRecentSelect?.(item)
+                setDropdownOpen(false)
+              }}
+              onClear={onRecentClear}
+              onRemove={onRecentRemove}
+              onViewHistory={() => {
+                onViewHistory?.()
+                setDropdownOpen(false)
+              }}
+              compact
+              showWhenEmpty
+              className="absolute top-[calc(100%+8px)] left-0 right-0 z-30"
+            />
+          )}
         </div>
 
         <button

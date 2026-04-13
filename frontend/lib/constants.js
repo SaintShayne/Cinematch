@@ -12,6 +12,7 @@ export const NAV_LINKS = [
   { href: '/browse', label: 'Browse', icon: 'grid' },
   { href: '/recommendations', label: 'For You', icon: 'sparkles' },
   { href: '/watchlist', label: 'Watchlist', icon: 'bookmark', protected: true },
+  { href: '/history', label: 'History', icon: 'history' },
   { href: '/about', label: 'About', icon: 'info' },
 ]
 

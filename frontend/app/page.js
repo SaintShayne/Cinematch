@@ -9,6 +9,12 @@ import MovieGrid from '../components/movie/MovieGrid'
 import SectionHeader from '../components/ui/SectionHeader'
 import Badge from '../components/ui/Badge'
 import { TECH_STACK } from '../lib/constants'
+import {
+  getRecentSearches,
+  saveRecentSearch,
+  clearRecentSearches,
+  deleteRecentSearch,
+} from '../lib/recentSearches'
 
 function StatsBar({ stats }) {
   if (!stats) return null
@@ -46,6 +52,7 @@ function SearchPageContent() {
   const [searchError, setSearchError] = useState(false)
   const [loadingTrending, setLoadingTrending] = useState(true)
   const [activeQuery, setActiveQuery] = useState(urlQuery)
+  const [recentSearches, setRecentSearches] = useState([])
 
   const runSearch = useCallback(
     async (q, selectedMode = mode) => {
@@ -81,6 +88,10 @@ function SearchPageContent() {
   }, [])
 
   useEffect(() => {
+    setRecentSearches(getRecentSearches())
+  }, [])
+
+  useEffect(() => {
     const trimmed = urlQuery.trim()
 
     setQuery(urlQuery)
@@ -92,6 +103,9 @@ function SearchPageContent() {
       setSearching(false)
       return
     }
+
+    const updated = saveRecentSearch(trimmed)
+    setRecentSearches(updated)
 
     setMode('smart')
     runSearch(trimmed, 'smart')
@@ -109,6 +123,22 @@ function SearchPageContent() {
     const trimmed = q.trim()
     if (!trimmed) return
     router.push(`/?q=${encodeURIComponent(trimmed)}`)
+  }
+
+  const handleRecentSelect = (q) => {
+    const updated = saveRecentSearch(q)
+    setRecentSearches(updated)
+    router.push(`/?q=${encodeURIComponent(q)}`)
+  }
+
+  const handleClearRecent = () => {
+    clearRecentSearches()
+    setRecentSearches([])
+  }
+
+  const handleRemoveRecent = (q) => {
+    const updated = deleteRecentSearch(q)
+    setRecentSearches(updated)
   }
 
   const handleMovieSelect = (movie) => {
@@ -147,6 +177,11 @@ function SearchPageContent() {
           onModeChange={setMode}
           loading={searching}
           autoFocus
+          recentSearches={recentSearches}
+          onRecentSelect={handleRecentSelect}
+          onRecentClear={handleClearRecent}
+          onRecentRemove={handleRemoveRecent}
+          onViewHistory={() => router.push('/history')}
         />
         <MoodFilters onSelect={navigateToQuery} activeQuery={activeQuery} />
       </div>

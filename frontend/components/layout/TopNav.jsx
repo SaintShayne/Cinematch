@@ -2,35 +2,74 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../lib/context/AuthContext'
+import RecentSearches from '../search/RecentSearches'
+import {
+  getRecentSearches,
+  saveRecentSearch,
+  clearRecentSearches,
+  deleteRecentSearch,
+} from '../../lib/recentSearches'
 
 export default function TopNav({ onMenuClick }) {
   const router = useRouter()
   const { user } = useAuth()
   const searchParams = useSearchParams()
   const [searchValue, setSearchValue] = useState('')
+  const [recentSearches, setRecentSearches] = useState([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const searchRef = useRef(null)
 
   const q = searchParams.get('q') || ''
 
-  // Keep the top nav input synced with the current URL query
   useEffect(() => {
     setSearchValue(q)
   }, [q])
 
+  useEffect(() => {
+    setRecentSearches(getRecentSearches())
+  }, [])
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
   const handleSearch = (e) => {
     e.preventDefault()
-
     const trimmed = searchValue.trim()
     if (!trimmed) return
-
-    // Universal search entry point: always go through homepage smart search
+    const updated = saveRecentSearch(trimmed)
+    setRecentSearches(updated)
+    setShowDropdown(false)
     router.push(`/?q=${encodeURIComponent(trimmed)}`)
+  }
+
+  const handleRecentSelect = (query) => {
+    const updated = saveRecentSearch(query)
+    setRecentSearches(updated)
+    setShowDropdown(false)
+    router.push(`/?q=${encodeURIComponent(query)}`)
+  }
+
+  const handleClearRecent = () => {
+    clearRecentSearches()
+    setRecentSearches([])
+  }
+
+  const handleRemoveRecent = (query) => {
+    const updated = deleteRecentSearch(query)
+    setRecentSearches(updated)
   }
 
   return (
     <header className="sticky top-0 z-20 h-14 bg-surface/90 backdrop-blur-md border-b border-[rgba(255,255,255,0.06)] flex items-center gap-4 px-4 sm:px-6">
-      {/* Mobile menu toggle */}
       <button
         onClick={onMenuClick}
         aria-label="Open navigation"
@@ -45,31 +84,49 @@ export default function TopNav({ onMenuClick }) {
         </svg>
       </button>
 
-      {/* Quick search (hidden on very small screens) */}
-      <form onSubmit={handleSearch} className="hidden sm:flex flex-1 max-w-sm">
-        <div className="relative w-full">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path
-                fillRule="evenodd"
-                d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="Search movies..."
-            className="w-full bg-surface-elevated border border-[rgba(255,255,255,0.08)] rounded-lg pl-9 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-red/50 transition-colors"
+      {/* Quick search with recent searches dropdown */}
+      <div ref={searchRef} className="hidden sm:flex flex-1 max-w-sm relative">
+        <form onSubmit={handleSearch} className="w-full">
+          <div className="relative w-full">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path
+                  fillRule="evenodd"
+                  d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchValue}
+              onFocus={() => setShowDropdown(true)}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder="Search movies..."
+              className="w-full bg-surface-elevated border border-[rgba(255,255,255,0.08)] rounded-lg pl-9 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-red/50 transition-colors"
+            />
+          </div>
+        </form>
+
+        {showDropdown && (
+          <RecentSearches
+            items={recentSearches.slice(0, 5)}
+            onSelect={handleRecentSelect}
+            onClear={handleClearRecent}
+            onRemove={handleRemoveRecent}
+            onViewHistory={() => {
+              setShowDropdown(false)
+              router.push('/history')
+            }}
+            compact
+            showWhenEmpty
+            className="absolute top-[calc(100%+8px)] left-0 right-0 z-30"
           />
-        </div>
-      </form>
+        )}
+      </div>
 
       <div className="flex-1 lg:hidden" />
 
-      {/* Right side */}
       <div className="flex items-center gap-2">
         {user ? (
           <Link

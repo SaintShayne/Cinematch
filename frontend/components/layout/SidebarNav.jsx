@@ -30,6 +30,11 @@ const icons = {
       <path d="M6.75 2.75A2.75 2.75 0 004 5.5v11.75a.75.75 0 001.26.55L10 13.06l4.74 4.74A.75.75 0 0016 17.25V5.5A2.75 2.75 0 0013.25 2.75h-6.5z" />
     </svg>
   ),
+  history: (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .199.079.39.22.53l2.75 2.75a.75.75 0 101.06-1.06l-2.53-2.53V5z" clipRule="evenodd" />
+    </svg>
+  ),
   info: (
     <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />

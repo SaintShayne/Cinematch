@@ -200,11 +200,17 @@ export default function MovieDetailPage() {
             )}
           </div>
 
-          {/* Genres */}
+          {/* Genres — click to browse that genre */}
           {movie.genres?.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {movie.genres.map((g) => (
-                <Badge key={g} variant="default">{g}</Badge>
+                <button
+                  key={g}
+                  onClick={() => router.push(`/browse?genre=${encodeURIComponent(g)}&page=1`)}
+                  className="hover:opacity-70 transition-opacity"
+                >
+                  <Badge variant="default">{g}</Badge>
+                </button>
               ))}
             </div>
           )}

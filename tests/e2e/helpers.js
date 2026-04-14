@@ -39,7 +39,7 @@ const RECS = [
  */
 async function mockBackend(page, overrides = {}) {
   const defaults = {
-    '/trending':        { movies: MOVIES, count: MOVIES.length },
+    '/trending':        { data: { movies: MOVIES, count: MOVIES.length } },
     '/stats':           { total_movies: 5000, total_genres: 20, search_types: 2 },
     '/genres':          { genres: ['Action', 'Comedy', 'Drama'], count: 3 },
     '/search':          { results: MOVIES, count: MOVIES.length, query: '' },

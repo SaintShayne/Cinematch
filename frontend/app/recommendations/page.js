@@ -186,7 +186,10 @@ function RecommendationsContent() {
     trackView({ title, poster_url: posters[title] })
     setMovieTitle(title)
     router.replace(`/recommendations?movie=${encodeURIComponent(title)}`, { scroll: false })
-    fetchRecs(title, count)
+    // fetchRecs is intentionally NOT called here — the URL effect fires it once
+    // router.replace completes and useSearchParams() updates to the new title.
+    // Calling fetchRecs concurrently with the navigation caused a race that
+    // prevented the URL from updating reliably in Next.js 16.
   }
 
   const handleCountChange = (n) => {

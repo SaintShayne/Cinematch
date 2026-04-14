@@ -55,7 +55,7 @@ function SearchPageContent() {
   const [recentSearches, setRecentSearches] = useState([])
 
   const runSearch = useCallback(
-    async (q, selectedMode = mode) => {
+    async (q, selectedMode) => {
       const trimmed = q.trim()
       if (!trimmed) return
 
@@ -77,7 +77,7 @@ function SearchPageContent() {
         setSearching(false)
       }
     },
-    [mode]
+    [] // stable reference — selectedMode is always passed explicitly at every call site
   )
 
   useEffect(() => {

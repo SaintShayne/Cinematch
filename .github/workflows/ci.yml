@@ -77,7 +77,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build Next.js
         env:
@@ -131,7 +131,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_API_URL: http://localhost:8000
         run: |
-          npm ci && npm run build && npm run start &
+          npm ci --legacy-peer-deps && npm run build && npm run start &
           for i in $(seq 1 30); do curl -sf http://localhost:3000 && break; sleep 1; done
 
       - name: Run Playwright smoke tests

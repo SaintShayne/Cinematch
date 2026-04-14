@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthGuard from '../../components/auth/AuthGuard'
 import PageHero from '../../components/layout/PageHero'
@@ -9,7 +9,9 @@ import SectionHeader from '../../components/ui/SectionHeader'
 import Button from '../../components/ui/Button'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingState from '../../components/ui/LoadingState'
+import RecommendationPanel from '../../components/movie/RecommendationPanel'
 import { useWatchlist } from '../../lib/hooks/useWatchlist'
+import { api } from '../../lib/api'
 
 function WatchlistCard({ item, onGetRecs, onRemove }) {
   const [imgError, setImgError] = useState(false)
@@ -79,6 +81,29 @@ function WatchlistContent() {
   const router = useRouter()
   const { watchlist, loading, removeFromWatchlist } = useWatchlist()
 
+  const [recs, setRecs] = useState([])
+  const [recPosters, setRecPosters] = useState({})
+  const [recsLoading, setRecsLoading] = useState(false)
+
+  // Fetch personalised recs once the watchlist is loaded and non-empty.
+  // Re-runs whenever the watchlist changes (add/remove).
+  useEffect(() => {
+    if (loading || watchlist.length === 0) return
+    setRecsLoading(true)
+    const titles = watchlist.map((item) => item.movie_title)
+    api.watchlistRecs(titles, 12)
+      .then((data) => {
+        setRecs(data.recommendations || [])
+        setRecPosters(data.posters || {})
+      })
+      .catch(() => setRecs([]))
+      .finally(() => setRecsLoading(false))
+  }, [watchlist, loading])
+
+  const handleRecSelect = (recTitle) => {
+    router.push(`/movies/${encodeURIComponent(recTitle)}`)
+  }
+
   const handleGetRecs = (title) => {
     router.push(`/recommendations?movie=${encodeURIComponent(title)}`)
   }
@@ -110,30 +135,49 @@ function WatchlistContent() {
           }
         />
       ) : (
-        <div>
-          <SectionHeader
-            title="Saved films"
-            action={
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => router.push('/browse')}
-              >
-                Add more
-              </Button>
-            }
-          />
-          <div className="space-y-2">
-            {watchlist.map((item) => (
-              <WatchlistCard
-                key={item.id}
-                item={item}
-                onGetRecs={handleGetRecs}
-                onRemove={removeFromWatchlist}
-              />
-            ))}
+        <>
+          <div>
+            <SectionHeader
+              title="Saved films"
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => router.push('/browse')}
+                >
+                  Add more
+                </Button>
+              }
+            />
+            <div className="space-y-2">
+              {watchlist.map((item) => (
+                <WatchlistCard
+                  key={item.id}
+                  item={item}
+                  onGetRecs={handleGetRecs}
+                  onRemove={removeFromWatchlist}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+
+          {/* Only render when loading or when we actually have results */}
+          {(recsLoading || recs.length > 0) && (
+            <div>
+              <SectionHeader
+                title="Recommended for you"
+                subtitle="Based on your watchlist"
+              />
+              <RecommendationPanel
+                recommendations={recs}
+                posters={recPosters}
+                loading={recsLoading}
+                onSelect={handleRecSelect}
+                count={12}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   )

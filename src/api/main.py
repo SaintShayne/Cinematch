@@ -258,6 +258,11 @@ class TelegramConfigRequest(BaseModel):
     chat_id: str
 
 
+class WatchlistRecsRequest(BaseModel):
+    titles: list[str]
+    n: int = 12
+
+
 class FeatureFlagRequest(BaseModel):
     flag: str
     enabled: bool
@@ -364,6 +369,21 @@ def recommend(
         "movie": movie,
         "count": len(recommendations),
         "recommendations": recommendations,
+        "posters": posters,
+    })
+
+
+@app.post("/recommend/watchlist", tags=["Recommendations"])
+@limiter.limit("20/minute")
+def recommend_from_watchlist(request: Request, body: WatchlistRecsRequest):
+    if not body.titles:
+        return _error("BAD_REQUEST", "titles list cannot be empty", 400)
+    # Cap and sanitise each title to prevent abuse
+    titles = [_sanitise(t) for t in body.titles[:20]]
+    recs, posters = service.get_watchlist_recommendations(titles, body.n)
+    return _ok({
+        "count": len(recs),
+        "recommendations": recs,
         "posters": posters,
     })
 

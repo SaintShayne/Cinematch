@@ -216,6 +216,65 @@ class RecommendationService:
 
         return {"movies": movies, "count": len(movies)}
 
+    def get_watchlist_recommendations(self, titles: list, n: int = 12):
+        """
+        Aggregate recommendations across multiple watchlist titles.
+
+        Seeds up to 5 titles into the recommender (capping avoids expensive
+        matrix lookups for large watchlists). Pools 20 candidates per seed,
+        sums scores for titles that appear in multiple seed results (a film
+        recommended by several of the user's saved films is a stronger signal),
+        removes titles already in the watchlist, and returns the top N with
+        posters.
+
+        The displayed score is the per-seed average so the match % badge
+        remains meaningful on the frontend.
+        """
+        if not titles:
+            return [], {}
+
+        seeds = titles[:5]
+        watchlist_lower = {t.lower() for t in titles}
+
+        # title -> {"sum": float, "count": int, "explanations": list}
+        score_map: dict = {}
+
+        for seed in seeds:
+            try:
+                recs = self.recommender.recommend(seed, 20)
+            except Exception:
+                continue
+            for rec in recs:
+                t = rec["title"]
+                if t.lower() in watchlist_lower:
+                    continue  # skip films the user already saved
+                if t not in score_map:
+                    score_map[t] = {
+                        "sum": 0.0,
+                        "count": 0,
+                        "explanations": rec.get("explanations", []),
+                    }
+                score_map[t]["sum"] += rec["score"]
+                score_map[t]["count"] += 1
+
+        if not score_map:
+            return [], {}
+
+        # Sort by sum — titles appearing in multiple seed results rank higher
+        top = sorted(score_map.items(), key=lambda x: x[1]["sum"], reverse=True)[:n]
+
+        recommendations = [
+            {
+                "title": title,
+                "score": data["sum"] / data["count"],  # average for % match display
+                "explanations": data["explanations"],
+            }
+            for title, data in top
+        ]
+
+        posters = fetch_posters([r["title"] for r in recommendations])
+        return recommendations, posters
+
     def get_stats(self) -> dict:
         """Return platform statistics for the investor metrics bar."""
         genres = self.get_genres()

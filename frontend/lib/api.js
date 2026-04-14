@@ -52,6 +52,12 @@ export const api = {
       `/recommend?movie=${encodeURIComponent(movie)}&n=${n}`
     ),
 
+  watchlistRecs: (titles, n = 12) =>
+    apiFetch('/recommend/watchlist', {
+      method: 'POST',
+      body: JSON.stringify({ titles, n }),
+    }),
+
   // Trending
   trending: (limit = 20) => apiFetch(`/trending?limit=${limit}`),
 

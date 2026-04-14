@@ -142,7 +142,7 @@ function SearchPageContent() {
   }
 
   const handleMovieSelect = (movie) => {
-    router.push(`/recommendations?movie=${encodeURIComponent(movie.title)}`)
+    router.push(`/movies/${encodeURIComponent(movie.title)}`)
   }
 
   const showResults = !!activeQuery && !searching

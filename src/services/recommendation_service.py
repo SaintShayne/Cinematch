@@ -8,6 +8,7 @@ This is the business-logic layer between:
 - poster fetching
 """
 
+import json
 import math
 
 import pandas as pd
@@ -15,7 +16,7 @@ import pandas as pd
 from src.models.recommender import MovieRecommender
 from src.models.semantic_search import SemanticSearchEngine
 from src.services.poster_service import fetch_posters
-from src.data.loader import load_movies
+from src.data.loader import load_movies, load_credits
 from src.data.preprocessing import extract_genres
 
 
@@ -123,13 +124,48 @@ class RecommendationService:
         row = df.iloc[0]
         posters = fetch_posters([row["title"]])
 
+        def _safe_int(val):
+            try:
+                return None if pd.isna(val) else int(val)
+            except Exception:
+                return None
+
+        def _safe_str(val):
+            try:
+                return "" if pd.isna(val) else str(val).strip()
+            except Exception:
+                return ""
+
+        # Extract director and top-5 cast from credits CSV
+        director = None
+        cast = []
+        try:
+            credits_df = load_credits()
+            credit_row = credits_df[
+                credits_df["title"].str.lower() == title.lower()
+            ]
+            if not credit_row.empty:
+                cr = credit_row.iloc[0]
+                crew = json.loads(cr["crew"]) if isinstance(cr["crew"], str) else []
+                directors = [c["name"] for c in crew if c.get("job") == "Director"]
+                director = directors[0] if directors else None
+                cast_raw = json.loads(cr["cast"]) if isinstance(cr["cast"], str) else []
+                cast = [c["name"] for c in cast_raw[:5]]
+        except Exception:
+            pass
+
         return {
             "title": row["title"],
-            "release_year": None if row["release_year"] != row["release_year"] else int(row["release_year"]),
+            "release_year": _safe_int(row["release_year"]),
             "vote_average": float(row["vote_average"]),
+            "vote_count": _safe_int(row.get("vote_count")),
             "overview": row["overview"],
             "genres": row["genre_list"],
-            "poster_url": posters.get(row["title"])
+            "poster_url": posters.get(row["title"]),
+            "runtime": _safe_int(row.get("runtime")),
+            "tagline": _safe_str(row.get("tagline", "")),
+            "director": director,
+            "cast": cast,
         }
 
     def get_recommendations(self, movie_title: str, num: int = 10):

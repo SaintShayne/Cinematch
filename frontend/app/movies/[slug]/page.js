@@ -241,6 +241,16 @@ export default function MovieDetailPage() {
             <Button variant="secondary" loading={saving} onClick={handleSave}>
               {inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
             </Button>
+            {movie.trailer_url && (
+              <a
+                href={movie.trailer_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red text-white hover:bg-red/80 transition-colors"
+              >
+                ▶ Watch Trailer
+              </a>
+            )}
           </div>
         </div>
       </div>

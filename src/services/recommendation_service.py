@@ -12,12 +12,48 @@ import json
 import math
 
 import pandas as pd
+import requests
 
 from src.models.recommender import MovieRecommender
 from src.models.semantic_search import SemanticSearchEngine
 from src.services.poster_service import fetch_posters
 from src.data.loader import load_movies, load_credits
 from src.data.preprocessing import extract_genres
+from src.config.settings import TMDB_API_KEY
+
+
+# In-memory cache so the same movie's trailer isn't fetched from TMDB
+# more than once per server process lifetime.
+_trailer_cache: dict = {}
+
+
+def _fetch_trailer(tmdb_id: int) -> str | None:
+    """
+    Return the first YouTube trailer URL for a TMDB movie ID, or None.
+
+    Calls GET /movie/{id}/videos, filters for site=YouTube + type=Trailer,
+    and constructs a standard watch URL from the video key.
+    Results are cached in _trailer_cache to avoid repeat API calls.
+    """
+    if not TMDB_API_KEY:
+        return None
+    if tmdb_id in _trailer_cache:
+        return _trailer_cache[tmdb_id]
+    try:
+        resp = requests.get(
+            f"https://api.themoviedb.org/3/movie/{tmdb_id}/videos",
+            params={"api_key": TMDB_API_KEY},
+            timeout=5,
+        )
+        for v in resp.json().get("results", []):
+            if v.get("site") == "YouTube" and v.get("type") == "Trailer":
+                url = f"https://www.youtube.com/watch?v={v['key']}"
+                _trailer_cache[tmdb_id] = url
+                return url
+    except Exception:
+        pass
+    _trailer_cache[tmdb_id] = None
+    return None
 
 
 class RecommendationService:
@@ -154,6 +190,9 @@ class RecommendationService:
         except Exception:
             pass
 
+        tmdb_id = _safe_int(row.get("id"))
+        trailer_url = _fetch_trailer(tmdb_id) if tmdb_id else None
+
         return {
             "title": row["title"],
             "release_year": _safe_int(row["release_year"]),
@@ -166,6 +205,7 @@ class RecommendationService:
             "tagline": _safe_str(row.get("tagline", "")),
             "director": director,
             "cast": cast,
+            "trailer_url": trailer_url,
         }
 
     def get_recommendations(self, movie_title: str, num: int = 10):

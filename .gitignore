@@ -22,7 +22,6 @@ data/cache/
 # Large datasets (use git-lfs or external storage)
 data/raw/
 data/*.csv
-*.csv
 
 # Next.js
 frontend/.next/

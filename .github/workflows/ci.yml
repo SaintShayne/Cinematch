@@ -24,6 +24,12 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r requirements.txt
 
+      - name: Copy fixture data for CI
+        run: |
+          mkdir -p data/raw
+          cp tests/fixtures/tmdb_5000_movies.csv data/raw/
+          cp tests/fixtures/tmdb_5000_credits.csv data/raw/
+
       - name: Start backend server (background)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

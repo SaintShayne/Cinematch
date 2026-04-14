@@ -64,12 +64,11 @@ Full architecture: `docs/working-practices.md` → Architecture section.
 
 ## Current project state
 
-**CI status:** FAILING — backend pytest and frontend Next.js build both failing.
-See `docs/working-practices.md` → Known Issues section for details.
+**CI status:** GREEN — all 16 E2E tests pass; backend pytest and frontend Next.js build both passing.
 
-**Last worked on:** Search history / recent searches feature (fully merged to main).
+**Last worked on:** E2E test suite stabilisation. Fixed Next.js 16 concurrent scheduler race condition in recommendations page — `router.replace` was being dropped when called in the same tick as `setState`; replaced with `window.history.replaceState`. All fixes merged through develop → staging → main.
 
-**Active branch:** `main` (clean, linear history — 4 commits).
+**Active branch:** `main` (clean, linear history).
 
 **Local dev:** Run frontend with `cd frontend && npm run dev`, backend with
 `uvicorn src.api.main:app --reload --port 8000`. Docker is for integration testing only.

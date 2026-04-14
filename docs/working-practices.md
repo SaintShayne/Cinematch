@@ -508,19 +508,17 @@ frontend/components/movie/MovieGrid.jsx   (renders the results)
 
 ## Known Issues
 
-### CI — currently failing (as of 2026-04-14)
+### CI — fully green (as of 2026-04-14)
 
-**Job: Backend — pytest**
-- Likely cause: GitHub Secrets not configured (GROQ_API_KEY, TMDB_API_KEY, OMDB_API_KEY)
-- Fix: Go to GitHub → Settings → Secrets and variables → Actions → add each key
-- Secondary cause: data files (`data/`) are gitignored so the ML model can't load in CI
+All three CI jobs pass: **backend pytest**, **frontend Next.js build**, **E2E Playwright (16/16)**.
 
-**Job: Frontend — Next.js build**
-- Likely cause: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY not in GitHub Secrets
-- Fix: same as above — add them in GitHub Secrets
-- Secondary cause: possible import error from the recently added history feature
+**What was fixed to get here:**
+- GitHub Secrets added for `GROQ_API_KEY`, `TMDB_API_KEY`, `OMDB_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Data fixture CSVs added and copied into the CI environment so the ML model loads
+- Backend port reuse fixed to avoid conflict when CI reuses an existing server
+- **Root cause of the last E2E failure:** Next.js 16's concurrent scheduler drops a `router.replace` call when it fires in the same tick as a `setState`. Fixed in `frontend/app/recommendations/page.js` by replacing `router.replace(...)` with `window.history.replaceState(null, '', newUrl)` in `handleRecSelect`.
 
-**How to diagnose a CI failure:**
+**How to diagnose a CI failure if one appears in future:**
 1. Go to GitHub → Actions tab
 2. Click the failed run
 3. Click the failing job

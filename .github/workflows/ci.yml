@@ -31,11 +31,18 @@ jobs:
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: |
           uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
+          SERVER_PID=$!
           # Wait for server to be ready (max 30 s)
           for i in $(seq 1 30); do
-            curl -sf http://localhost:8000/health && break
+            if curl -sf http://localhost:8000/health; then
+              echo "✓ Backend server is ready"
+              exit 0
+            fi
             sleep 1
           done
+          echo "✗ Backend server failed to start within 30 seconds"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
 
       - name: Run pytest (search + recommend + chat/admin)
         env:

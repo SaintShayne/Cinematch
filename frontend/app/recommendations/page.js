@@ -185,11 +185,13 @@ function RecommendationsContent() {
   const handleRecSelect = (title) => {
     trackView({ title, poster_url: posters[title] })
     setMovieTitle(title)
-    router.replace(`/recommendations?movie=${encodeURIComponent(title)}`, { scroll: false })
-    // fetchRecs is intentionally NOT called here — the URL effect fires it once
-    // router.replace completes and useSearchParams() updates to the new title.
-    // Calling fetchRecs concurrently with the navigation caused a race that
-    // prevented the URL from updating reliably in Next.js 16.
+    // window.history.replaceState instead of router.replace: in Next.js 16,
+    // router.replace called in the same tick as setMovieTitle() can be deferred
+    // or dropped by React's concurrent scheduler. replaceState is a synchronous,
+    // direct write to the browser's history API — it always updates window.location
+    // immediately, regardless of React's render queue.
+    window.history.replaceState(null, '', `/recommendations?movie=${encodeURIComponent(title)}`)
+    fetchRecs(title, count)
   }
 
   const handleCountChange = (n) => {

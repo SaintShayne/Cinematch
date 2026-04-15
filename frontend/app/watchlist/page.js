@@ -13,7 +13,7 @@ import RecommendationPanel from '../../components/movie/RecommendationPanel'
 import { useWatchlist } from '../../lib/hooks/useWatchlist'
 import { api } from '../../lib/api'
 
-function WatchlistCard({ item, onGetRecs, onRemove }) {
+function WatchlistCard({ item, onGetRecs, onRemove, onNavigate }) {
   const [imgError, setImgError] = useState(false)
   const [removing, setRemoving] = useState(false)
 
@@ -24,7 +24,10 @@ function WatchlistCard({ item, onGetRecs, onRemove }) {
   }
 
   return (
-    <div className="flex items-center gap-4 p-3 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.1)] transition-colors group">
+    <div
+      onClick={onNavigate}
+      className="flex items-center gap-4 p-3 rounded-xl bg-surface-elevated border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.1)] transition-colors group cursor-pointer"
+    >
       {/* Poster thumbnail */}
       <div className="relative w-12 h-16 flex-shrink-0 rounded-md overflow-hidden bg-surface">
         {item.poster_url && !imgError ? (
@@ -56,7 +59,11 @@ function WatchlistCard({ item, onGetRecs, onRemove }) {
       </div>
 
       {/* Actions — always visible on mobile, hover-reveal on desktop */}
-      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      {/* stopPropagation prevents card onClick from firing when buttons are clicked */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+      >
         <Button
           size="sm"
           variant="secondary"
@@ -156,6 +163,7 @@ function WatchlistContent() {
                   item={item}
                   onGetRecs={handleGetRecs}
                   onRemove={removeFromWatchlist}
+                  onNavigate={() => router.push(`/movies/${encodeURIComponent(item.movie_title)}`)}
                 />
               ))}
             </div>

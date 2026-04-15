@@ -7,7 +7,9 @@ import { api } from '../../../lib/api'
 import { useAuth } from '../../../lib/context/AuthContext'
 import { useWatchlist } from '../../../lib/hooks/useWatchlist'
 import { useRecentlyViewed } from '../../../lib/hooks/useRecentlyViewed'
+import Link from 'next/link'
 import RecommendationPanel from '../../../components/movie/RecommendationPanel'
+import WatchProvidersModal from '../../../components/movie/WatchProvidersModal'
 import SectionHeader from '../../../components/ui/SectionHeader'
 import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
@@ -81,6 +83,7 @@ export default function MovieDetailPage() {
   const [error, setError] = useState(false)
   const [imgError, setImgError] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showWatchModal, setShowWatchModal] = useState(false)
 
   const inWatchlist = isInWatchlist(title)
 
@@ -220,13 +223,30 @@ export default function MovieDetailPage() {
             {movie.director && (
               <p>
                 <span className="text-text-muted">Director</span>
-                <span className="ml-2 text-text-secondary">{movie.director}</span>
+                <Link
+                  href={`/people/${encodeURIComponent(movie.director)}`}
+                  className="ml-2 text-text-secondary hover:text-text-primary hover:underline underline-offset-2 transition-colors"
+                >
+                  {movie.director}
+                </Link>
               </p>
             )}
             {movie.cast?.length > 0 && (
-              <p>
+              <p className="flex flex-wrap items-baseline gap-x-1">
                 <span className="text-text-muted">Cast</span>
-                <span className="ml-2 text-text-secondary">{movie.cast.join(', ')}</span>
+                {movie.cast.map((name, i) => (
+                  <span key={name}>
+                    <Link
+                      href={`/people/${encodeURIComponent(name)}`}
+                      className="ml-1 text-text-secondary hover:text-text-primary hover:underline underline-offset-2 transition-colors"
+                    >
+                      {name}
+                    </Link>
+                    {i < movie.cast.length - 1 && (
+                      <span className="text-text-muted">,</span>
+                    )}
+                  </span>
+                ))}
               </p>
             )}
           </div>
@@ -246,11 +266,42 @@ export default function MovieDetailPage() {
                 href={movie.trailer_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red text-white hover:bg-red/80 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red/10 text-red border border-red/25 hover:bg-red/20 transition-colors"
               >
                 ▶ Watch Trailer
               </a>
             )}
+            {movie.watch_providers && (
+              <button
+                onClick={() => setShowWatchModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20 transition-colors"
+              >
+                ▶ Stream Now
+                <span className="flex items-center gap-1">
+                  {movie.watch_providers.flatrate?.slice(0, 3).map((p) =>
+                    p.logo ? (
+                      <img key={p.name} src={p.logo} alt={p.name} title={p.name} className="h-5 w-5 rounded object-cover opacity-90" />
+                    ) : null
+                  )}
+                </span>
+              </button>
+            )}
+            <a
+              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + ' full movie')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-surface-high text-text-secondary border border-[rgba(255,255,255,0.08)] hover:text-text-primary hover:border-[rgba(255,255,255,0.16)] transition-colors"
+            >
+              Browse YouTube
+            </a>
+            <a
+              href={`https://archive.org/search?query=${encodeURIComponent(movie.title)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-surface-high text-text-secondary border border-[rgba(255,255,255,0.08)] hover:text-text-primary hover:border-[rgba(255,255,255,0.16)] transition-colors"
+            >
+              Try Internet Archive
+            </a>
           </div>
         </div>
       </div>
@@ -281,6 +332,15 @@ export default function MovieDetailPage() {
           count={6}
         />
       </section>
+
+      {/* ── Where to Watch modal ── */}
+      {showWatchModal && movie.watch_providers && (
+        <WatchProvidersModal
+          providers={movie.watch_providers}
+          movieTitle={movie.title}
+          onClose={() => setShowWatchModal(false)}
+        />
+      )}
 
     </div>
   )

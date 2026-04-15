@@ -35,6 +35,9 @@ export const api = {
   movie: (title) =>
     apiFetch(`/movie/${encodeURIComponent(title)}`),
 
+  person: (name) =>
+    apiFetch(`/person/${encodeURIComponent(name)}`),
+
   // Search
   search: (query, limit = 20) =>
     apiFetch(

@@ -318,6 +318,14 @@ def get_movie_details(title: str = Path(...)):
     return _ok({"movie": movie})
 
 
+@app.get("/person/{name}", tags=["Browse"])
+def get_person_details(name: str = Path(...)):
+    person = service.get_person_details(name)
+    if not person:
+        return _error("NOT_FOUND", "Person not found", 404)
+    return _ok({"person": person})
+
+
 @app.get("/trending", tags=["Browse"])
 def get_trending(limit: int = Query(20, ge=1, le=50)):
     return _ok({"data": service.get_trending(limit)})

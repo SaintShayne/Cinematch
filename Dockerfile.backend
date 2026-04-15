@@ -1,6 +1,14 @@
 ## ── CineMatch Backend — Dockerfile ──────────────────────────────────────────
 ## Multi-stage build: keeps the final image lean by separating the dependency
 ## install stage from the runtime stage.
+##
+## Dataset CSVs are not committed to git (too large). Instead they are
+## downloaded from Supabase Storage at image build time so that they become
+## a cached Docker layer — Render only re-downloads when this file changes.
+##
+## Build-time args (set in Render → Environment → Build vars):
+##   MOVIES_CSV_URL  — public Supabase Storage URL for tmdb_5000_movies.csv
+##   CREDITS_CSV_URL — public Supabase Storage URL for tmdb_5000_credits.csv
 
 # ── Stage 1: dependency install ───────────────────────────────────────────────
 FROM python:3.11-slim AS deps
@@ -14,6 +22,10 @@ RUN pip install --no-cache-dir --prefix=/deps -r requirements.txt
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
+# curl is needed to download the dataset CSVs at build time
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Non-root user for security
 RUN addgroup --system app && adduser --system --ingroup app app
 
@@ -24,8 +36,18 @@ COPY --from=deps /deps /usr/local
 
 # Copy source code
 COPY src/ ./src/
-COPY data/ ./data/
-COPY cache/ ./cache/
+
+# Download dataset CSVs from Supabase Storage at build time.
+# These become a cached layer — Render only re-runs this step when the URLs change.
+ARG MOVIES_CSV_URL=https://chrckycjejoxihtqsqkn.supabase.co/storage/v1/object/public/cinematch-data/tmdb_5000_movies.csv
+ARG CREDITS_CSV_URL=https://chrckycjejoxihtqsqkn.supabase.co/storage/v1/object/public/cinematch-data/tmdb_5000_credits.csv
+RUN mkdir -p data/raw \
+    && curl -fSL "${MOVIES_CSV_URL}" -o data/raw/tmdb_5000_movies.csv \
+    && curl -fSL "${CREDITS_CSV_URL}" -o data/raw/tmdb_5000_credits.csv
+
+# Create the runtime cache directory with correct ownership.
+# The poster cache (posters.json) is generated at runtime by TMDB API calls.
+RUN mkdir -p cache && chown app:app cache
 
 # Set Python path so `src.*` imports resolve
 ENV PYTHONPATH=/app

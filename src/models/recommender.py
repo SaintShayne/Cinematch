@@ -40,9 +40,10 @@ class MovieRecommender:
         self.df["tags"] = self.df.apply(self.combine_features, axis=1)
 
         self.cv = CountVectorizer(max_features=5000, stop_words="english")
-        self.vectors = self.cv.fit_transform(self.df["tags"]).toarray()
-
-        self.similarity = cosine_similarity(self.vectors)
+        # Keep as sparse matrix — converting to dense (.toarray()) would use ~192MB
+        # and pre-computing the full N×N similarity matrix uses another ~184MB.
+        # Instead we compute similarity on-demand per query (a few ms, not noticeable).
+        self.vectors = self.cv.fit_transform(self.df["tags"])
 
     def parse_list(self, text):
         """
@@ -135,9 +136,12 @@ class MovieRecommender:
             "Mystery", "Crime", "History"
         }
 
+        # Compute similarity for this one movie against all others (sparse, fast).
+        sim_scores = cosine_similarity(self.vectors[source_idx], self.vectors).flatten()
+
         candidates = []
 
-        for target_idx, content_similarity in enumerate(self.similarity[source_idx]):
+        for target_idx, content_similarity in enumerate(sim_scores):
             if target_idx == source_idx:
                 continue
 

@@ -187,7 +187,7 @@ export default function SupportPage() {
       setSupportError('Could not reach the server. Please try again.')
       setTimeout(() => setSupporting(false), 2000)
     }
-  }, [supporting])
+  }, [supporting, user])
 
   return (
     <div className="space-y-12 max-w-2xl">

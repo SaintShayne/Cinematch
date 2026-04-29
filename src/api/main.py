@@ -828,19 +828,15 @@ async def stripe_webhook(request: Request):
         if webhook_secret:
             event = _stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
         else:
-            # No secret configured — parse without verification (dev only)
             import json as _json
             event = _stripe.Event.construct_from(_json.loads(payload), _stripe.api_key)
-    except _stripe.SignatureVerificationError:
-        logger.warning("stripe webhook: invalid signature")
-        return JSONResponse(status_code=400, content={"error": "Invalid signature"})
     except Exception as exc:
-        logger.error("stripe webhook parse error", extra={"error": str(exc)})
-        return JSONResponse(status_code=400, content={"error": "Bad payload"})
+        logger.error("stripe webhook error", extra={"error": str(exc)})
+        return JSONResponse(status_code=400, content={"error": str(exc)})
 
-    if event["type"] == "checkout.session.completed":
-        session_obj = event["data"]["object"]
-        user_id = session_obj.get("client_reference_id")
+    if event.type == "checkout.session.completed":
+        session_obj = event.data.object
+        user_id = getattr(session_obj, "client_reference_id", None)
         if user_id:
             supabase_url = (os.environ.get("SUPABASE_URL") or
                             os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")

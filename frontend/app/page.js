@@ -162,7 +162,7 @@ function SearchPageContent() {
             Find your next film.
           </h1>
           <p className="text-base text-text-secondary max-w-lg">
-            Describe a vibe, a feeling, or just a title — CineMatch finds the right match.
+            Describe a vibe, a feeling, or just a title. CineMatch finds the right match.
           </p>
           <StatsBar stats={stats} />
         </div>

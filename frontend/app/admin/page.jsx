@@ -66,7 +66,10 @@ export default function AdminDashboard() {
   const [hasDevCookie, setHasDevCookie] = useState(false)
   useEffect(() => {
     setMounted(true)
-    setHasDevCookie(document.cookie.includes('cinematch_dev_admin='))
+    setHasDevCookie(
+      process.env.NODE_ENV === 'development' &&
+      document.cookie.includes('cinematch_dev_admin=')
+    )
   }, [])
 
   const adminUserId = user?.id ?? 'dev-admin'
@@ -137,14 +140,23 @@ export default function AdminDashboard() {
   const [usersFetched, setUsersFetched] = useState(false)
 
   const fetchUsers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, display_name, role, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50)
+    try {
+      const json = await fetch(`${API}/admin/users`).then((r) => r.json())
+      if (json.success) setUsers(json.users ?? [])
+    } catch { /* non-fatal */ }
     setUsersFetched(true)
-    if (!error) setUsers(data ?? [])
-  }, [supabase])
+  }, [])
+
+  const [reports, setReports] = useState([])
+  const [reportsFetched, setReportsFetched] = useState(false)
+
+  const fetchReports = useCallback(async () => {
+    try {
+      const json = await fetch(`${API}/admin/reports`).then((r) => r.json())
+      if (json.success) setReports(json.reports ?? [])
+    } catch { /* non-fatal */ }
+    setReportsFetched(true)
+  }, [])
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
@@ -162,8 +174,9 @@ export default function AdminDashboard() {
     fetchLogs()
     fetch2FAStatus()
     fetchTelegramConfig()
-    if (user) fetchUsers()
-  }, [mounted, user, hasDevCookie, fetchStats, fetchFlags, fetchLogs, fetch2FAStatus, fetchTelegramConfig, fetchUsers])
+    fetchUsers()
+    fetchReports()
+  }, [mounted, user, hasDevCookie, fetchStats, fetchFlags, fetchLogs, fetch2FAStatus, fetchTelegramConfig, fetchUsers, fetchReports])
 
   // ── Guards ────────────────────────────────────────────────────────────────
   if (!mounted) return null
@@ -179,7 +192,7 @@ export default function AdminDashboard() {
   if (!user && !hasDevCookie) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-sm text-red-400">Access denied — please log in.</p>
+        <p className="text-sm text-red-400">Access denied. Please log in.</p>
       </div>
     )
   }
@@ -187,7 +200,7 @@ export default function AdminDashboard() {
   if (user && profile && profile.role !== 'admin') {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-sm text-red-400">Access denied — admins only.</p>
+        <p className="text-sm text-red-400">Access denied. Admins only.</p>
       </div>
     )
   }
@@ -280,7 +293,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({ user_id: adminUserId, token: totpInput }),
       }).then((r) => r.json())
       if (json.success) {
-        setTwoFAMsg('2FA enabled — you will be prompted on next login.')
+        setTwoFAMsg('2FA enabled. You will be prompted on next login.')
         setQrCode(null)
         setTotpInput('')
         setTwoFAStatus({ enabled: true, method: 'totp' })
@@ -307,7 +320,7 @@ export default function AdminDashboard() {
       try {
         json = await res.json()
       } catch {
-        setTwoFAMsg(`Server error (HTTP ${res.status}) — check the backend logs for details.`)
+        setTwoFAMsg(`Server error (HTTP ${res.status}). Check the backend logs for details.`)
         return
       }
 
@@ -317,7 +330,7 @@ export default function AdminDashboard() {
         setTwoFAMsg(json.error?.message ?? `Failed to send OTP (HTTP ${res.status}).`)
       }
     } catch {
-      setTwoFAMsg('Could not reach the backend — make sure it is running on port 8000.')
+      setTwoFAMsg('Could not reach the backend. Make sure it is running on port 8000.')
     } finally {
       setTgSending(false)
     }
@@ -332,7 +345,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({ user_id: adminUserId, code: tgInput }),
       }).then((r) => r.json())
       if (json.success) {
-        setTwoFAMsg('Telegram 2FA enabled — you will be prompted on next login.')
+        setTwoFAMsg('Telegram 2FA enabled. You will be prompted on next login.')
         setTgSent(false)
         setTgInput('')
         setTwoFAStatus({ enabled: true, method: 'telegram' })
@@ -452,11 +465,7 @@ export default function AdminDashboard() {
               {users.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-5 py-8 text-center text-text-muted">
-                    {!user
-                      ? 'User list requires a Supabase login — dev mode shows backend data only.'
-                      : !usersFetched
-                      ? 'Loading…'
-                      : 'No users returned — run the admin RLS policy in supabase/schema.sql to grant read-all access.'}
+                    {!usersFetched ? 'Loading…' : 'No registered users yet.'}
                   </td>
                 </tr>
               ) : users.map((u) => (
@@ -497,7 +506,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm font-medium text-text-primary">
                 {twoFAStatus?.enabled
-                  ? `2FA enabled — ${twoFAStatus.method === 'telegram' ? 'Telegram OTP' : 'TOTP Authenticator'}`
+                  ? `2FA enabled: ${twoFAStatus.method === 'telegram' ? 'Telegram OTP' : 'TOTP Authenticator'}`
                   : '2FA disabled'}
               </p>
               <p className="text-xs text-text-muted mt-0.5">
@@ -594,8 +603,8 @@ export default function AdminDashboard() {
                         Open Telegram, search for your bot, and send it <span className="font-mono text-text-secondary">/start</span>.
                       </li>
                       <li>
-                        Open <span className="font-mono text-text-secondary break-all">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span> in your browser — find{' '}
-                        <span className="font-mono text-text-secondary">"chat":&#123;"id": 123456789&#125;</span> — that number is your <strong className="text-text-primary">Chat ID</strong>.
+                        Open <span className="font-mono text-text-secondary break-all">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span> in your browser. Find{' '}
+                        <span className="font-mono text-text-secondary">"chat":&#123;"id": 123456789&#125;</span>. That number is your <strong className="text-text-primary">Chat ID</strong>.
                       </li>
                     </ol>
                     <p className="text-xs text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2">
@@ -741,7 +750,7 @@ export default function AdminDashboard() {
         </div>
         <div className="rounded-2xl border border-[rgba(255,255,255,0.07)] bg-[#080909] p-4 max-h-72 overflow-y-auto font-mono text-[11px] space-y-0.5">
           {logs.length === 0 ? (
-            <p className="text-text-muted py-4 text-center">No log entries yet — make some requests to the backend.</p>
+            <p className="text-text-muted py-4 text-center">No log entries yet. Make some requests to the backend.</p>
           ) : logs.map((entry, i) => (
             <div key={i} className="flex gap-3 py-0.5">
               <span className="text-text-muted shrink-0 tabular-nums">{entry.ts}</span>
@@ -754,6 +763,55 @@ export default function AdminDashboard() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Reports ── */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <SectionHeading>Reports</SectionHeading>
+          <button
+            onClick={fetchReports}
+            className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+        <Panel>
+          {!reportsFetched ? (
+            <p className="text-text-muted py-4 text-center text-xs">Loading…</p>
+          ) : reports.length === 0 ? (
+            <p className="text-text-muted py-4 text-center text-xs">No reports submitted yet.</p>
+          ) : (
+            <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+              {reports.map((r) => (
+                <div key={r.id} className="px-5 py-4 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      r.category === 'bug'
+                        ? 'bg-red/10 border-red/30 text-red'
+                        : r.category === 'feature'
+                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
+                        : 'bg-white/5 border-white/10 text-text-muted'
+                    }`}>
+                      {r.category}
+                    </span>
+                    {r.has_attachment && (
+                      <span className="text-[10px] text-text-muted">📎 {r.file_name ?? 'attachment'}</span>
+                    )}
+                    <span className="text-[10px] text-text-muted ml-auto">
+                      {r.created_at ? new Date(r.created_at).toLocaleString() : ''}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-text-primary">{r.subject}</p>
+                  <p className="text-xs text-text-secondary leading-relaxed line-clamp-3">{r.description}</p>
+                  {r.email && (
+                    <p className="text-xs text-text-muted">{r.email}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
       </section>
 
     </div>

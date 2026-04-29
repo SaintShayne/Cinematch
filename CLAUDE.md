@@ -66,7 +66,67 @@ Full architecture: `docs/working-practices.md` → Architecture section.
 
 **CI status:** GREEN — all 16 E2E tests pass; backend pytest and frontend Next.js build both passing.
 
-**Last worked on:** E2E test suite stabilisation. Fixed Next.js 16 concurrent scheduler race condition in recommendations page — `router.replace` was being dropped when called in the same tick as `setState`; replaced with `window.history.replaceState`. All fixes merged through develop → staging → main.
+**Last worked on (v5 update):**
+- Renamed "For You" tab to "Recommendations" (star icon)
+- Swept all pages for em-dashes; replaced with natural punctuation
+- Support page: Stripe Checkout integration, local currency display, shared feature list, sign-in guard
+- Report an Issue page: file upload (images/video/PDF), Supabase storage, Telegram forwarding, admin dashboard visibility
+- Admin panel: Reports section added (category badges, attachment indicator, Refresh button)
+- Stripe webhook: `POST /stripe-webhook` marks `profiles.is_supporter = true` on payment completion
+- `client_reference_id` (Supabase user ID) and `customer_email` are passed to Stripe checkout session
+
+**Deployment:**
+- Frontend: `https://cinematch.shaynelabs.co` (Vercel, auto-deploys on push to main)
+- Backend: `https://cinematch-backend-7v9e.onrender.com` (Render, Docker, free tier — 30s cold start)
+- Old Vercel URL `cinematch-nine-pearl.vercel.app` still works but `shaynelabs.co` is canonical
+
+**Auth status:**
+- Google OAuth: working on production
+- Email registration: working — confirmation emails sent via Resend SMTP from `noreply@shaynelabs.co`
+- Supabase redirect URLs: localhost:3000, cinematch.shaynelabs.co, cinematch-nine-pearl.vercel.app all configured
+
+**Admin panel:**
+- Access: Google login with `tanlimhan@gmail.com` (role = admin in profiles table) OR `admin`/`admin` dev login
+- Dev cookie bypass (`cinematch_dev_admin`) is disabled in production (NODE_ENV guard), active in local dev only
+- User management: reads all profiles via `/admin/users` backend endpoint (service role key, bypasses RLS)
+- Reports: reads all submitted reports via `/admin/reports` (service role key, bypasses RLS)
+- Telegram 2FA: persists across Render restarts via `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` env vars
+- Feature flags: `enable_chat` and `enable_recommendations` now both wired to their endpoints
+
+**Stripe payment flow:**
+- User must be signed in to trigger checkout (sign-in guard on Support page button)
+- Frontend POSTs `user_id` + `email` to `/create-checkout-session`
+- Backend creates Stripe Checkout Session with `client_reference_id=user_id` and `customer_email`
+- On success, Stripe sends `checkout.session.completed` to `/stripe-webhook`
+- Webhook reads `client_reference_id`, PATCHes `profiles.is_supporter = true` in Supabase
+- Webhook secret: `STRIPE_WEBHOOK_SECRET` (whsec_... from Stripe dashboard)
+- Stripe dashboard webhook URL: `https://cinematch-backend-7v9e.onrender.com/stripe-webhook`
+- Event to subscribe: `checkout.session.completed`
+
+**Supabase SQL needed (run once in Supabase SQL editor):**
+```sql
+-- Support page: track supporter status
+alter table profiles add column if not exists is_supporter boolean default false;
+
+-- Report an Issue page
+create table if not exists reports (
+  id          uuid primary key default gen_random_uuid(),
+  category    text not null,
+  subject     text not null,
+  description text not null,
+  email       text,
+  has_attachment boolean default false,
+  file_name   text,
+  created_at  timestamptz default now()
+);
+alter table reports enable row level security;
+create policy "service role full access" on reports using (true) with check (true);
+```
+
+**Env vars needed locally (.env):**
+`TMDB_API_KEY`, `OMDB_API_KEY`, `GROQ_API_KEY`, `ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_URL`,
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 
 **Active branch:** `main` (clean, linear history).
 

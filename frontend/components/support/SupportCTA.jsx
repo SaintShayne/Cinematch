@@ -34,7 +34,7 @@ export default function SupportCTA({ variant = 'banner', className }) {
           Support the project
         </h2>
         <p className="text-sm text-text-secondary max-w-sm mx-auto mb-6">
-          Help shape what comes next — every contribution helps keep CineMatch free and improving.
+          Every contribution helps keep CineMatch free and improving.
         </p>
         <Link
           href="/support"

@@ -213,7 +213,7 @@ function RecommendationsContent() {
       {/* Movie search with autocomplete */}
       <div>
         <p className="text-xs text-text-muted mb-3">
-          Start typing a title — select from suggestions or press Enter
+          Start typing a title, select from suggestions or press Enter
         </p>
         <MovieSearchInput
           onSelect={handleSelect}

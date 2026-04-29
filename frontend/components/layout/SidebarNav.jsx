@@ -40,6 +40,16 @@ const icons = {
       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
     </svg>
   ),
+  star: (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+      <path fillRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clipRule="evenodd" />
+    </svg>
+  ),
+  flag: (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+      <path d="M3.5 2.75a.75.75 0 00-1.5 0v14.5a.75.75 0 001.5 0v-4.392l1.657-.348a6.449 6.449 0 014.271.572 7.948 7.948 0 005.965.524l2.078-.64A.75.75 0 0018 12.25v-8.5a.75.75 0 00-.904-.734l-2.38.501a7.25 7.25 0 01-4.186-.363l-.502-.2a8.75 8.75 0 00-5.053-.439l-1.475.31V2.75z" />
+    </svg>
+  ),
 }
 
 const bookmarkIcon = (
@@ -114,12 +124,28 @@ export default function SidebarNav({ open, onClose }) {
               : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
           )}
         >
-          <span className="text-text-muted">
+          <span className={pathname === '/support' ? 'text-red' : 'text-text-muted'}>
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M10 2a6 6 0 00-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 00.515 1.076 32.91 32.91 0 003.256.508 3.5 3.5 0 006.972 0 32.903 32.903 0 003.256-.508.75.75 0 00.515-1.076A11.448 11.448 0 0116 8a6 6 0 00-6-6zM8.05 14.943a33.54 33.54 0 003.9 0 2 2 0 01-3.9 0z" clipRule="evenodd" />
             </svg>
           </span>
           Support
+        </Link>
+
+        <Link
+          href="/report"
+          onClick={onClose}
+          className={cn(
+            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
+            pathname === '/report'
+              ? 'bg-red/10 text-red font-medium'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+          )}
+        >
+          <span className={pathname === '/report' ? 'text-red' : 'text-text-muted'}>
+            {icons.flag}
+          </span>
+          Report an Issue
         </Link>
 
         {/* Watchlist preview */}

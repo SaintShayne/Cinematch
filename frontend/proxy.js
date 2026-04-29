@@ -56,7 +56,7 @@ export async function proxy(request) {
 
   if (isAdminRoute && !isAdminPublic) {
     const devAdminCookie = request.cookies.get('cinematch_dev_admin')
-    if (devAdminCookie?.value) {
+    if (process.env.NODE_ENV === 'development' && devAdminCookie?.value) {
       return supabaseResponse
     }
 

@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
         setError(json?.error?.message ?? `Server error (HTTP ${res.status})`)
       }
     } catch {
-      setError('Could not reach the backend — is it running?')
+      setError('Could not reach the backend. Is it running?')
     } finally {
       setTgSending(false)
     }
@@ -96,7 +96,7 @@ export default function AdminLoginPage() {
       const json = await res.json()
 
       if (!json.success) {
-        setError(json.error?.message ?? 'Invalid code — try again.')
+        setError(json.error?.message ?? 'Invalid code. Try again.')
         setLoading(false)
         return
       }
@@ -226,7 +226,7 @@ export default function AdminLoginPage() {
         <div>
           <h1 className="text-xl font-bold text-text-primary">Admin login</h1>
           <p className="text-xs text-text-muted mt-1">
-            DEV mode — use <span className="font-mono text-text-secondary">admin / admin</span>
+            DEV mode: use <span className="font-mono text-text-secondary">admin / admin</span>
           </p>
         </div>
 

@@ -70,7 +70,7 @@ export default function LoginForm({ redirectTo = '/' }) {
         setError(json?.error?.message ?? `Server error (HTTP ${res.status})`)
       }
     } catch {
-      setError('Could not reach the backend — is it running?')
+      setError('Could not reach the backend. Is it running?')
     } finally {
       setTgSending(false)
     }
@@ -99,7 +99,7 @@ export default function LoginForm({ redirectTo = '/' }) {
       const json = await res.json()
 
       if (!json.success) {
-        setError(json.error?.message ?? 'Invalid code — please try again.')
+        setError(json.error?.message ?? 'Invalid code. Please try again.')
         setLoading(false)
         return
       }
@@ -128,7 +128,7 @@ export default function LoginForm({ redirectTo = '/' }) {
         const json = await res.json()
 
         if (!res.ok || !json.success) {
-          setError(json.error?.message ?? 'Admin login failed — is the backend running?')
+          setError(json.error?.message ?? 'Admin login failed. Is the backend running?')
           setLoading(false)
           return
         }

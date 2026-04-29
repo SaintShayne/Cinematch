@@ -3,7 +3,7 @@ import { AuthProvider } from '../lib/context/AuthContext'
 import AppShell from '../components/layout/AppShell'
 
 export const metadata = {
-  title: 'CineMatch — Movie Discovery',
+  title: 'CineMatch | Movie Discovery',
   description:
     'Discover your next favourite film with AI-powered recommendations, semantic search, and personalised watchlists.',
 }

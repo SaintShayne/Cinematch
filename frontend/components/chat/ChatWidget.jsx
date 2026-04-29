@@ -162,7 +162,7 @@ export default function ChatWidget() {
             {messages.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-xs text-text-muted">
-                  Ask me anything about movies — recommendations, directors, genres, or trivia.
+                  Ask me anything about movies: recommendations, directors, genres, or trivia.
                 </p>
                 <div className="flex flex-wrap gap-1.5 justify-center mt-3">
                   {[

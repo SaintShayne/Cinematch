@@ -17,6 +17,8 @@ python-multipart
 # 2FA (TOTP)
 pyotp
 qrcode[pil]
+# Payments
+stripe
 # Testing
 pytest
 pytest-asyncio

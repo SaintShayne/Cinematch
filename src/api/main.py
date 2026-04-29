@@ -17,6 +17,7 @@ import secrets
 import time
 from datetime import datetime
 import requests as _http
+import stripe as _stripe
 
 import logging
 import pyotp
@@ -24,7 +25,7 @@ import qrcode
 import qrcode.image.svg
 import io
 import base64
-from fastapi import FastAPI, HTTPException, Query, Path, Request, Depends
+from fastapi import FastAPI, HTTPException, Query, Path, Request, Depends, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
@@ -114,6 +115,17 @@ _feature_flags = {
     "enable_chat": True,
     "enable_recommendations": True,
 }
+
+# Restore Telegram 2FA from env vars on startup so it survives Render restarts.
+# Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Render → Environment once after setup.
+_tg_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+_tg_chat  = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+if _tg_token and _tg_chat:
+    _telegram_config_store["dev-admin"] = {"bot_token": _tg_token, "chat_id": _tg_chat}
+    _admin_2fa_store["dev-admin"] = {"enable_2fa": True, "auth_method": "telegram"}
+
+# Stripe — set STRIPE_SECRET_KEY in Render (live) or .env (test)
+_stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -368,6 +380,8 @@ def recommend(
     movie: str = Query(...),
     n: int = Query(10, ge=1, le=20),
 ):
+    if not _feature_flags.get("enable_recommendations", True):
+        return _error("FEATURE_DISABLED", "Recommendations are currently disabled", 503)
     movie = _sanitise(movie)
     with RequestTimer(logger, "recommend", movie=movie):
         recommendations, posters = service.get_recommendations(movie, n)
@@ -384,6 +398,8 @@ def recommend(
 @app.post("/recommend/watchlist", tags=["Recommendations"])
 @limiter.limit("20/minute")
 def recommend_from_watchlist(request: Request, body: WatchlistRecsRequest):
+    if not _feature_flags.get("enable_recommendations", True):
+        return _error("FEATURE_DISABLED", "Recommendations are currently disabled", 503)
     if not body.titles:
         return _error("BAD_REQUEST", "titles list cannot be empty", 400)
     # Cap and sanitise each title to prevent abuse
@@ -465,6 +481,24 @@ def admin_stats():
         "total_genres": stats.get("total_genres", 0),
         "feature_flags": _feature_flags,
     })
+
+
+@app.get("/admin/users", tags=["Admin"])
+def get_admin_users():
+    """Return all user profiles using the Supabase service role key (bypasses RLS)."""
+    supabase_url = (os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")
+    service_key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not supabase_url or not service_key:
+        return _error("CONFIG_MISSING", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set", 503)
+    resp = _http.get(
+        f"{supabase_url}/rest/v1/profiles",
+        params={"select": "id,email,display_name,role,created_at", "order": "created_at.desc", "limit": "50"},
+        headers={"Authorization": f"Bearer {service_key}", "apikey": service_key},
+        timeout=10,
+    )
+    if not resp.ok:
+        return _error("SUPABASE_ERROR", "Failed to fetch users from Supabase", 502)
+    return _ok({"users": resp.json()})
 
 
 @app.get("/admin/feature-flags", tags=["Admin"])
@@ -726,4 +760,234 @@ logging.getLogger("cinematch.api").addHandler(_buf_handler)
 def get_logs():
     """Return the last 100 in-memory log entries."""
     return _ok({"count": len(_in_memory_log_buffer), "logs": list(reversed(_in_memory_log_buffer))})
+
+
+# ── Public: issue reports ─────────────────────────────────────────────────────
+
+# ── Payments ──────────────────────────────────────────────────────────────────
+
+class CheckoutSessionRequest(BaseModel):
+    success_url: str
+    cancel_url: str
+    user_id: str | None = None
+    email: str | None = None
+
+
+@app.post("/create-checkout-session", tags=["Payments"])
+@limiter.limit("10/minute")
+def create_checkout_session(request: Request, body: CheckoutSessionRequest):
+    """Create a Stripe Checkout Session for a $3 one-time support payment."""
+    if not _stripe.api_key:
+        return _error("CONFIG_MISSING", "Payment is not configured yet", 503)
+    try:
+        create_kwargs: dict = dict(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": 300,
+                    "product_data": {
+                        "name": "CineMatch Supporter",
+                        "description": "A one-time contribution to keep CineMatch running.",
+                    },
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=body.success_url,
+            cancel_url=body.cancel_url,
+        )
+        if body.user_id:
+            create_kwargs["client_reference_id"] = body.user_id
+        if body.email:
+            create_kwargs["customer_email"] = body.email
+        session = _stripe.checkout.Session.create(**create_kwargs)
+        return _ok({"url": session.url})
+    except _stripe.StripeError as exc:
+        logger.error("stripe checkout error", extra={"error": str(exc)})
+        return _error("STRIPE_ERROR", "Could not create checkout session", 502)
+
+
+# ── Stripe webhook ────────────────────────────────────────────────────────────
+
+@app.post("/stripe-webhook", tags=["Payments"])
+async def stripe_webhook(request: Request):
+    """
+    Receives Stripe events. On checkout.session.completed, marks the user as
+    a supporter in Supabase by setting profiles.is_supporter = true.
+
+    Stripe signs every event with STRIPE_WEBHOOK_SECRET (whsec_...).
+    The raw request body must be read before any parsing — FastAPI's Request
+    gives us that via request.body().
+    """
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+
+    try:
+        if webhook_secret:
+            event = _stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        else:
+            # No secret configured — parse without verification (dev only)
+            import json as _json
+            event = _stripe.Event.construct_from(_json.loads(payload), _stripe.api_key)
+    except _stripe.SignatureVerificationError:
+        logger.warning("stripe webhook: invalid signature")
+        return JSONResponse(status_code=400, content={"error": "Invalid signature"})
+    except Exception as exc:
+        logger.error("stripe webhook parse error", extra={"error": str(exc)})
+        return JSONResponse(status_code=400, content={"error": "Bad payload"})
+
+    if event["type"] == "checkout.session.completed":
+        session_obj = event["data"]["object"]
+        user_id = session_obj.get("client_reference_id")
+        if user_id:
+            supabase_url = (os.environ.get("SUPABASE_URL") or
+                            os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")
+            service_key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+            if supabase_url and service_key:
+                try:
+                    _http.patch(
+                        f"{supabase_url}/rest/v1/profiles",
+                        params={"id": f"eq.{user_id}"},
+                        json={"is_supporter": True},
+                        headers={
+                            "Authorization": f"Bearer {service_key}",
+                            "apikey": service_key,
+                            "Prefer": "return=minimal",
+                        },
+                        timeout=10,
+                    )
+                    logger.info("supporter tag applied", extra={"user_id": user_id})
+                except Exception as exc:
+                    logger.error("supporter patch failed", extra={"error": str(exc)})
+
+    return _ok({"received": True})
+
+
+# ── Public: issue reports ─────────────────────────────────────────────────────
+
+_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+_ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm"}
+_ALLOWED_DOC_TYPES   = {"application/pdf"}
+_MAX_IMAGE_BYTES = 5  * 1024 * 1024   # 5 MB
+_MAX_VIDEO_BYTES = 20 * 1024 * 1024   # 20 MB
+_MAX_DOC_BYTES   = 10 * 1024 * 1024   # 10 MB
+
+
+@app.post("/report", tags=["Report"])
+@limiter.limit("5/minute")
+async def submit_report(
+    request: Request,
+    category:    str            = Form(...),
+    subject:     str            = Form(...),
+    description: str            = Form(...),
+    email:       str | None     = Form(None),
+    attachment:  UploadFile | None = File(None),
+):
+    """Accept a bug/feedback report. Stores in Supabase and forwards to Telegram."""
+    category    = category.strip().lower()
+    subject     = subject.strip()
+    description = description.strip()
+
+    if category not in ("bug", "feature", "feedback"):
+        return _error("INVALID_CATEGORY", "category must be bug, feature, or feedback", 400)
+    if not 3 <= len(subject) <= 120:
+        return _error("INVALID_SUBJECT", "subject must be 3-120 characters", 400)
+    if not 10 <= len(description) <= 2000:
+        return _error("INVALID_DESCRIPTION", "description must be 10-2000 characters", 400)
+
+    file_content: bytes | None = None
+    file_name:    str   | None = None
+    file_type:    str   | None = None
+
+    if attachment and attachment.filename:
+        ct = (attachment.content_type or "").lower()
+        if ct in _ALLOWED_IMAGE_TYPES:
+            max_b = _MAX_IMAGE_BYTES
+        elif ct in _ALLOWED_VIDEO_TYPES:
+            max_b = _MAX_VIDEO_BYTES
+        elif ct in _ALLOWED_DOC_TYPES:
+            max_b = _MAX_DOC_BYTES
+        else:
+            return _error("INVALID_FILE_TYPE",
+                          "Unsupported file type. Allowed: JPG/PNG/GIF/WEBP, MP4/MOV/WEBM, PDF", 400)
+        file_content = await attachment.read()
+        if len(file_content) > max_b:
+            return _error("FILE_TOO_LARGE",
+                          f"File exceeds the {max_b // (1024*1024)} MB limit for this type", 400)
+        file_name = attachment.filename
+        file_type = ct
+
+    # Persist to Supabase
+    supabase_url = (os.environ.get("SUPABASE_URL") or
+                    os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")
+    service_key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if supabase_url and service_key:
+        try:
+            _http.post(
+                f"{supabase_url}/rest/v1/reports",
+                json={
+                    "category": category, "subject": subject,
+                    "description": description, "email": email or None,
+                    "has_attachment": file_content is not None,
+                    "file_name": file_name,
+                },
+                headers={"Authorization": f"Bearer {service_key}",
+                         "apikey": service_key, "Prefer": "return=minimal"},
+                timeout=10,
+            )
+        except Exception as exc:
+            logger.warning("report supabase store failed", extra={"error": str(exc)})
+
+    # Forward to Telegram
+    if _tg_token and _tg_chat:
+        try:
+            caption = "\n".join(filter(None, [
+                f"\U0001f4cb *New {category.title()} Report*",
+                f"*Subject:* {subject}",
+                f"*Description:* {description[:800]}",
+                f"*Email:* {email}" if email else None,
+            ]))
+            if file_content:
+                is_image  = file_type in _ALLOWED_IMAGE_TYPES
+                tg_field  = "photo" if is_image else "document"
+                tg_method = "sendPhoto" if is_image else "sendDocument"
+                _http.post(
+                    f"https://api.telegram.org/bot{_tg_token}/{tg_method}",
+                    data={"chat_id": _tg_chat, "caption": caption, "parse_mode": "Markdown"},
+                    files={tg_field: (file_name, file_content, file_type)},
+                    timeout=30,
+                )
+            else:
+                _http.post(
+                    f"https://api.telegram.org/bot{_tg_token}/sendMessage",
+                    json={"chat_id": _tg_chat, "text": caption, "parse_mode": "Markdown"},
+                    timeout=10,
+                )
+        except Exception as exc:
+            logger.warning("report telegram forward failed", extra={"error": str(exc)})
+
+    logger.info("report received", extra={"category": category, "subject": subject[:50]})
+    return _ok({"message": "Report received. Thank you for your feedback."})
+
+
+@app.get("/admin/reports", tags=["Admin"])
+def get_admin_reports():
+    """Return all submitted reports from the Supabase reports table."""
+    supabase_url = (os.environ.get("SUPABASE_URL") or
+                    os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")
+    service_key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not supabase_url or not service_key:
+        return _error("CONFIG_MISSING", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set", 503)
+    resp = _http.get(
+        f"{supabase_url}/rest/v1/reports",
+        params={"select": "id,category,subject,description,email,has_attachment,file_name,created_at",
+                "order": "created_at.desc", "limit": "100"},
+        headers={"Authorization": f"Bearer {service_key}", "apikey": service_key},
+        timeout=10,
+    )
+    if not resp.ok:
+        return _error("SUPABASE_ERROR", "Failed to fetch reports", 502)
+    return _ok({"reports": resp.json()})
 

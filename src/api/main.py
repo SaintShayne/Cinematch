@@ -843,20 +843,29 @@ async def stripe_webhook(request: Request):
             service_key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
             if supabase_url and service_key:
                 try:
-                    _http.patch(
+                    resp = _http.patch(
                         f"{supabase_url}/rest/v1/profiles",
                         params={"id": f"eq.{user_id}"},
                         json={"is_supporter": True},
                         headers={
                             "Authorization": f"Bearer {service_key}",
                             "apikey": service_key,
-                            "Prefer": "return=minimal",
+                            "Prefer": "return=representation",
                         },
                         timeout=10,
                     )
-                    logger.info("supporter tag applied", extra={"user_id": user_id})
+                    if not resp.ok:
+                        logger.error("supporter patch rejected", extra={"status": resp.status_code, "body": resp.text})
+                    else:
+                        updated = resp.json()
+                        if updated:
+                            logger.info("supporter tag applied", extra={"user_id": user_id})
+                        else:
+                            logger.error("supporter patch: 0 rows matched — UUID not in profiles", extra={"user_id": user_id})
                 except Exception as exc:
                     logger.error("supporter patch failed", extra={"error": str(exc)})
+            else:
+                logger.error("supporter patch skipped — missing supabase_url or service_key", extra={"user_id": user_id})
 
     return _ok({"received": True})
 

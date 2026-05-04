@@ -7,7 +7,7 @@
 
 ## Table of Contents
 
-1. [The Four Levels of AI Coding](#the-four-levels)
+1. [Engineering Standards](#engineering-standards)
 2. [File Taxonomy — What to Touch vs. Never Touch](#file-taxonomy)
 3. [Git — Every Command Explained](#git)
 4. [Docker — The Right Tool for Each Situation](#docker)
@@ -16,24 +16,15 @@
 
 ---
 
-## The Four Levels
+## Engineering Standards
 
-Understanding which level you're at tells you what discipline to add next.
+Core habits that keep the codebase healthy:
 
-| Level | Mindset | What's missing |
-|---|---|---|
-| **L1 — Vibe coding** | "It works, ship it" | No understanding of why it works |
-| **L2 — Disciplined agentic** | "I understand every file I commit" | Tests, hooks, branch discipline |
-| **L3 — Software engineering** | "Tests verify behaviour, not just structure" | Deep function-level understanding |
-| **L4 — Staff-level** | "Every line exists for a reason I can defend" | Nothing — this is the goal |
-
-**Where I am now:** Transitioning L1 → L2.
-
-**What L2 looks like in practice:**
-- Read every diff before staging (`git diff --staged`)
-- One commit = one decision, describable in a single sentence
-- Never commit auto-generated files
-- Ask "what does this function guarantee?" not just "what does it do?"
+- **Read every diff before staging** — run `git diff --staged` before every commit. If you see something unexpected, understand it before it goes in.
+- **One commit = one decision** — if you cannot describe the commit in a single sentence, you are committing too many things at once.
+- **Never commit auto-generated files** — if a file appeared after running a command and you have never edited it, it is generated. See the file taxonomy below.
+- **Tests verify behaviour, not structure** — a test that still passes when you break the feature is not a test. Always run the intentional-fail check: break one assertion, confirm the test goes red, revert.
+- **Understand every line you ship** — "it works" is not an explanation. Know the mechanism before you commit the fix.
 
 ---
 
@@ -530,5 +521,3 @@ CI runs the `@smoke` tag subset on Chromium only (fast path); full suite runs lo
 4. Expand the failing step — the error message is there
 5. Reproduce the same command locally before pushing a fix
 
-### Scripts directory
-`scripts/engine_manual_check.py` and `scripts/semantic_manual_check.py` are debug scripts from development. They are not tests. Consider deleting them or converting to proper pytest tests.

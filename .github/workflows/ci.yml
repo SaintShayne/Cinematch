@@ -162,7 +162,7 @@ jobs:
 
       - name: Run Playwright smoke tests
         working-directory: qa-automation
-        run: npx playwright test --project=chromium --grep @smoke
+        run: npx playwright test --project=chromium --grep @smoke --no-deps
         env:
           CI: true
 

@@ -66,13 +66,14 @@ module.exports = defineConfig({
     },
   ],
 
-  // Start the Next.js dev server automatically when running locally.
-  // In CI the server is started separately before Playwright; reuseExistingServer
-  // prevents a duplicate start and a port conflict.
+  // Start the Next.js dev server automatically if one isn't already running.
+  // reuseExistingServer:true means: if port 3000 is already up, skip the start
+  // command. This works locally (reuses your npm run dev) and in CI (reuses the
+  // server the workflow started before invoking Playwright).
   webServer: {
     command: 'cd ../frontend && npm run dev',
     url: FRONTEND_URL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',

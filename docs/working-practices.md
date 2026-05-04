@@ -1,8 +1,7 @@
 # CineMatch — Working Practices & Reference
 
-> Personal reference for SaintShayne.
-> Read this when starting a new session or before any significant change.
-> Last updated: 2026-04-15
+> Developer reference. Read this when starting a new session or before any significant change.
+> Last updated: 2026-05-04
 
 ---
 
@@ -60,7 +59,11 @@ Cinematch/
 ├── frontend/app/               Next.js pages (one folder = one URL route)
 ├── frontend/components/        Reusable React components
 ├── frontend/lib/               API client, contexts, hooks, utils
-├── tests/                      pytest (backend) + Playwright (e2e)
+├── tests/                      pytest (backend unit + integration tests)
+├── qa-automation/              Playwright E2E + API test suite (142 tests)
+│   ├── tests/e2e/              One spec file per feature area
+│   ├── playwright.config.js    Test projects: chromium, mobile, api
+│   └── package.json            Playwright dependency
 ├── supabase/schema.sql         Database table definitions
 │
 ├── Dockerfile.backend          How to build the Python container
@@ -70,14 +73,13 @@ Cinematch/
 │
 ├── frontend/tailwind.config.js Design tokens (colors, fonts, shadows)
 ├── frontend/next.config.js     Next.js configuration
-├── playwright.config.js        E2E test configuration
 ├── requirements.txt            Python dependencies (you maintain this)
 ├── frontend/package.json       JS dependencies + scripts (you maintain this)
 ├── .gitignore                  What git ignores (you maintain this)
 ├── .env                        Secret keys — NEVER commit, NEVER share
 ├── .env.example                Template for .env — DO commit this
-├── CLAUDE.md                   Instructions for Claude Code — DO commit
-├── docs/                       Your own documentation — DO commit
+├── CLAUDE.md                   Claude Code context — gitignored, local only
+├── docs/                       Developer documentation — DO commit
 └── README.md                   Project description — DO commit
 │
 │  ── AUTO-GENERATED (never edit, usually gitignored) ──
@@ -102,11 +104,11 @@ Cinematch/
 
 │  ── AUTO-GENERATED BUT COMMIT ANYWAY ──
 │
-├── frontend/package-lock.json  Exact JS dependency versions
-└── package-lock.json           Same for root Playwright packages
-                                Created by: npm install
-                                WHY commit: locks exact versions so CI and
-                                teammates get the same packages you tested with.
+├── frontend/package-lock.json      Exact JS dependency versions (frontend)
+└── qa-automation/package-lock.json Exact JS dependency versions (Playwright)
+                                    Created by: npm install
+                                    WHY commit: locks exact versions so CI and
+                                    teammates get the same packages you tested with.
 ```
 
 ---
@@ -508,15 +510,18 @@ frontend/components/movie/MovieGrid.jsx   (renders the results)
 
 ## Known Issues
 
-### CI — fully green (as of 2026-04-14)
+### CI — fully green (as of 2026-05-04)
 
-All three CI jobs pass: **backend pytest**, **frontend Next.js build**, **E2E Playwright (16/16)**.
+All three CI jobs pass: **backend pytest**, **frontend Next.js build**, **E2E Playwright (142/142)**.
+CI runs the `@smoke` tag subset on Chromium only (fast path); full suite runs locally.
 
-**What was fixed to get here:**
+**History of fixes:**
 - GitHub Secrets added for `GROQ_API_KEY`, `TMDB_API_KEY`, `OMDB_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - Data fixture CSVs added and copied into the CI environment so the ML model loads
 - Backend port reuse fixed to avoid conflict when CI reuses an existing server
-- **Root cause of the last E2E failure:** Next.js 16's concurrent scheduler drops a `router.replace` call when it fires in the same tick as a `setState`. Fixed in `frontend/app/recommendations/page.js` by replacing `router.replace(...)` with `window.history.replaceState(null, '', newUrl)` in `handleRecSelect`.
+- Next.js 16 concurrent scheduler drops a `router.replace` call when it fires in the same tick as a `setState`. Fixed in `frontend/app/recommendations/page.js` by replacing `router.replace(...)` with `window.history.replaceState(null, '', newUrl)` in `handleRecSelect`
+- Playwright suite migrated from root `tests/e2e/` to `qa-automation/` with Chromium + mobile + API projects
+- Strict-mode violations, SSR hydration double-render, and mobile overlay intercept issues resolved across all spec files
 
 **How to diagnose a CI failure if one appears in future:**
 1. Go to GitHub → Actions tab

@@ -1,0 +1,17 @@
+{
+  "name": "cinematch-qa",
+  "version": "1.0.0",
+  "description": "Playwright E2E and API test suite for CineMatch",
+  "private": true,
+  "scripts": {
+    "test:api":    "playwright test tests/e2e/health.spec.js --project=api",
+    "test:e2e":    "playwright test tests/e2e --project=chromium --project=mobile",
+    "test:all":    "playwright test",
+    "test:smoke":  "playwright test --grep @smoke",
+    "report":      "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "dotenv": "^16.4.5"
+  }
+}

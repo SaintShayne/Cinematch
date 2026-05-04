@@ -28,6 +28,12 @@ frontend/.next/
 frontend/node_modules/
 frontend/.env.local
 
+# Claude Code — local AI context (never commit — contains personal details)
+CLAUDE.md
+
+# QA artefacts — regenerate with python generate_qa_plan.py
+CineMatch_QA_Test_Plan.xlsx
+
 # Temp / junk
 *.tmp.*
 *.tmp

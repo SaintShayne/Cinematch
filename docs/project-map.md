@@ -22,7 +22,7 @@ No external UI library — all components are hand-built.
 | `frontend/lib/` | API client, utils, Supabase clients, contexts, hooks |
 | `src/api/` | FastAPI backend entry point |
 | `src/services/` | Python recommendation/search/chat logic |
-| `tests/e2e/` | Playwright E2E test suite |
+| `qa-automation/tests/e2e/` | Playwright E2E test suite (142 tests) |
 
 ### Frontend Flow
 

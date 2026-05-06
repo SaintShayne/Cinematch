@@ -71,7 +71,8 @@ export default function MovieDetailPage() {
   const router = useRouter()
   const title = decodeURIComponent(slug)
 
-  const { user } = useAuth()
+  const { user, loading: authLoading, supabase } = useAuth()
+  const [isSupporter, setIsSupporter] = useState(false)
   const { isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlist()
   const { trackView } = useRecentlyViewed()
 
@@ -110,6 +111,16 @@ export default function MovieDetailPage() {
       .catch(() => setRecs([]))
       .finally(() => setRecsLoading(false))
   }, [title])
+
+  useEffect(() => {
+    if (authLoading || !user) return
+    supabase
+      .from('profiles')
+      .select('is_supporter')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => setIsSupporter(data?.is_supporter ?? false))
+  }, [user, authLoading, supabase])
 
   const handleSave = async () => {
     if (!user) {
@@ -253,6 +264,17 @@ export default function MovieDetailPage() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3 pt-1">
+            {isSupporter && movie?.tmdb_id && (
+              <Link
+                href={`/watch?id=${movie.tmdb_id}&type=movie&title=${encodeURIComponent(movie.title)}&poster=${encodeURIComponent(movie.poster_url || '')}`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors shadow-[0_0_12px_rgba(245,158,11,0.12)] hover:shadow-[0_0_20px_rgba(245,158,11,0.22)]"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.344-5.891a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                </svg>
+                Watch
+              </Link>
+            )}
             <Button
               onClick={() => router.push(`/recommendations?movie=${encodeURIComponent(movie.title)}`)}
             >

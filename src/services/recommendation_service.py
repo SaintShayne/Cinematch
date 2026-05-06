@@ -495,6 +495,7 @@ class RecommendationService:
             "cast": cast,
             "trailer_url": trailer_url,
             "watch_providers": watch_providers,
+            "tmdb_id": tmdb_id,
         }
 
     def get_person_details(self, name: str) -> dict | None:

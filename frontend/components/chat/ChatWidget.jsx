@@ -77,7 +77,7 @@ export default function ChatWidget() {
   }, [open, messages])
 
   const handleMovieClick = (title) => {
-    router.push(`/?q=${encodeURIComponent(title)}`)
+    router.push(`/movies/${encodeURIComponent(title)}`)
     setOpen(false)
   }
 
@@ -91,7 +91,7 @@ export default function ChatWidget() {
     setLoading(true)
 
     try {
-      const contextTitles = watchlist.slice(0, 5).map((w) => w.movie_title)
+      const contextTitles = watchlist.slice(0, 15).map((w) => w.movie_title)
       const history = messages.map((m) => ({ role: m.role, content: m.content }))
       const data = await api.chat(history, text, contextTitles)
 

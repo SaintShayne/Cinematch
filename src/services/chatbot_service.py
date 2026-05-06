@@ -28,6 +28,8 @@ def send_message(
     messages: list[dict],
     user_input: str,
     dataset_suggestions: list[str] | None = None,
+    watchlist_titles: list[str] | None = None,
+    system_note: str | None = None,
 ) -> tuple[str, list[dict]]:
     """
     Send a message to CineMatch Assistant and return the reply + updated history.
@@ -45,27 +47,36 @@ def send_message(
     client = Groq(api_key=GROQ_API_KEY)
 
     # Build system prompt — optionally ground it to dataset titles
+    system_prompt = BASE_SYSTEM_PROMPT
+
+    if watchlist_titles:
+        wl = ", ".join(f'"{t}"' for t in watchlist_titles)
+        system_prompt += (
+            f"\n\nThe user's watchlist contains: {wl}. "
+            f"Only reference these if a title shares clear genre or theme overlap with the user's request. "
+            f"Never force a connection between unrelated films."
+        )
+
     if dataset_suggestions:
         title_list = ", ".join(f'"{t}"' for t in dataset_suggestions)
-        system_prompt = (
-            BASE_SYSTEM_PROMPT
-            + f"\n\nFor this response you have access to these verified CineMatch titles "
-            f"that are relevant to the user's request: {title_list}. "
-            f"Use these titles in your recommendations. "
-            f"Do NOT recommend any other titles not in this list."
+        system_prompt += (
+            f"\n\nFor this response, recommend ONLY from these verified CineMatch titles: {title_list}. "
+            f"Do NOT recommend any title not in this list."
         )
     else:
-        system_prompt = (
-            BASE_SYSTEM_PROMPT
-            + "\n\nIf you cannot find specific relevant titles, respond conversationally "
+        system_prompt += (
+            "\n\nIf you cannot find specific relevant titles, respond conversationally "
             "and suggest the user use the Search or Browse features."
         )
+
+    if system_note:
+        system_prompt += f"\n\n{system_note}"
 
     updated_messages = messages + [{"role": "user", "content": user_input}]
 
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        max_tokens=400,
+        model="llama-3.3-70b-versatile",
+        max_tokens=700,
         messages=[{"role": "system", "content": system_prompt}] + updated_messages,
     )
 

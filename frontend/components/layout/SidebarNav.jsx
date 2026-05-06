@@ -159,7 +159,7 @@ export default function SidebarNav({ open, onClose }) {
                 key={item.id}
                 onClick={() => {
                   router.push(
-                    `/recommendations?movie=${encodeURIComponent(item.movie_title)}`
+                    `/movies/${encodeURIComponent(item.movie_title)}`
                   )
                   onClose?.()
                 }}
@@ -183,9 +183,7 @@ export default function SidebarNav({ open, onClose }) {
                 key={i}
                 onClick={() => {
                   router.push(
-                    `/recommendations?movie=${encodeURIComponent(
-                      item.movie_title || item.title
-                    )}`
+                    `/movies/${encodeURIComponent(item.movie_title || item.title)}`
                   )
                   onClose?.()
                 }}

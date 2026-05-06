@@ -22,7 +22,7 @@ function RecommendationCard({ rec, poster, onSelect }) {
 
   const handleSelect = () => {
     trackView({ title: rec.title, poster_url: poster })
-    onSelect?.(rec.title)
+    router.push(`/movies/${encodeURIComponent(rec.title)}`)
   }
 
   const handleSave = async (e) => {

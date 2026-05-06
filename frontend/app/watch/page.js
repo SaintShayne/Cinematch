@@ -46,6 +46,7 @@ function WatchContent() {
   const [season, setSeason] = useState(1)
   const [episode, setEpisode] = useState(1)
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [source, setSource] = useState('vidsrc')
 
   useEffect(() => {
     if (authLoading) return
@@ -71,6 +72,12 @@ function WatchContent() {
       })
   }, [user, authLoading, router, supabase])
 
+  const SOURCES = [
+    { id: 'vidsrc',   label: 'VidSrc',   mode: 'embed' },
+    { id: 'cinegram', label: 'CineGram ↗', mode: 'external', url: () => `https://cinegram.net/index.php?menu=search&query=${encodeURIComponent(title)}` },
+    { id: 'watchtv',  label: 'WatchTV ↗',  mode: 'external', url: () => `https://www.watchtv.click/?s=${encodeURIComponent(title)}` },
+  ]
+
   const iframeSrc = (() => {
     if (!tmdbId) return ''
     if (type === 'tv') {
@@ -79,7 +86,16 @@ function WatchContent() {
     return `https://vidsrc-embed.ru/embed/movie?tmdb=${tmdbId}`
   })()
 
-  const iframeKey = type === 'tv' ? `${tmdbId}-s${season}e${episode}` : String(tmdbId)
+  const iframeKey = `${type === 'tv' ? `${tmdbId}-s${season}e${episode}` : tmdbId}`
+
+  const handleSourceClick = (s) => {
+    if (s.mode === 'external') {
+      window.open(s.url(), '_blank', 'noopener,noreferrer')
+    } else {
+      setSource(s.id)
+      setIframeLoaded(false)
+    }
+  }
 
   if (authLoading || isSupporter === null) {
     return redirectMsg ? (
@@ -221,6 +237,26 @@ function WatchContent() {
 
       {/* ── Section C — Player ── */}
       <section className="space-y-4">
+
+        {/* Source picker */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-text-muted font-medium">Source</span>
+          {SOURCES.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => handleSourceClick(s)}
+              className={[
+                'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                s.mode === 'embed' && source === s.id
+                  ? 'bg-red/15 text-red border-red/30'
+                  : 'text-text-muted border-[rgba(255,255,255,0.08)] hover:text-text-secondary hover:border-[rgba(255,255,255,0.15)]',
+              ].join(' ')}
+            >
+              {s.label}
+            </button>
+          ))}
+          <span className="text-2xs text-text-muted ml-1">VidSrc plays here · CineGram &amp; WatchTV open in a new tab</span>
+        </div>
 
         {type === 'tv' && (
           <div className="flex flex-wrap items-center gap-3">

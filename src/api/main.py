@@ -172,42 +172,162 @@ def _is_dev_admin(username: str, password: str) -> bool:
 # ── Chat helpers (unchanged from v3) ──────────────────────────────────────────
 
 def _find_seed_movie(message: str) -> str | None:
-    pattern = (
-        r'(?:movies?\s+like|films?\s+like|similar\s+to|like)\s+'
-        r'["\u201c\u201d\u2018\u2019]?([A-Za-z][^"\'?!\n]{1,50}?)'
-        r'["\u201c\u201d\u2018\u2019]?(?:\s*\(|\s*$|\s*[?!,.])'
-    )
-    m = _re.search(pattern, message, _re.IGNORECASE)
-    if m:
-        return m.group(1).strip().rstrip(',')
+    _Q = r'["\u201c\u201d\u2018\u2019]?'
+    _TITLE = r'([A-Za-z][^"\'?!\n]{1,50}?)'
+    _END = r'(?:\s*\(|\s*$|\s*[?!,.])'
+    patterns = [
+        # "movies/films like X", "similar to X", "more like X", "something/anything like X"
+        rf'(?:movies?\s+like|films?\s+like|similar\s+to|more\s+like|something\s+like|anything\s+like)\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "I loved/liked/enjoyed/watched/saw/adored X"
+        rf'i\s+(?:loved?|liked?|enjoyed?|watched?|saw|adored?|rewatched?)\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "after watching X" / "after X"
+        rf'after\s+(?:watching\s+)?{_Q}{_TITLE}{_Q}{_END}',
+        # "fans of X" / "fan of X"
+        rf'fans?\s+of\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "X vibes" (quoted or plain: 'Inception vibes')
+        rf'{_Q}{_TITLE}{_Q}\s+vibes?',
+        # "recommend something like X" / "suggest something like X"
+        rf'(?:recommend|suggest)\s+something\s+like\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "what should I watch after X"
+        rf'watch\s+after\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "just finished/watched/seen/completed X" / "just done with X"
+        rf'just\s+(?:finished|watched|seen|completed|done\s+with)\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "done with X" / "done watching X"
+        rf'done\s+(?:with|watching)\s+{_Q}{_TITLE}{_Q}{_END}',
+        # "finished X" (without "just")
+        rf'finished\s+{_Q}{_TITLE}{_Q}{_END}',
+    ]
+    for pat in patterns:
+        m = _re.search(pat, message, _re.IGNORECASE)
+        if m:
+            return m.group(1).strip().rstrip(',')
     return None
 
 
-def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -> list[str]:
+# Maps user-input genre terms to TMDB genre names used in the dataset
+_GENRE_MAP: dict[str, str] = {
+    'horror':           'Horror',
+    'scary':            'Horror',
+    'thriller':         'Thriller',
+    'suspense':         'Thriller',
+    'comedy':           'Comedy',
+    'funny':            'Comedy',
+    'humor':            'Comedy',
+    'humour':           'Comedy',
+    'romance':          'Romance',
+    'romantic':         'Romance',
+    'drama':            'Drama',
+    'action':           'Action',
+    'adventure':        'Adventure',
+    'sci-fi':           'Science Fiction',
+    'science fiction':  'Science Fiction',
+    'fantasy':          'Fantasy',
+    'animation':        'Animation',
+    'animated':         'Animation',
+    'documentary':      'Documentary',
+    'mystery':          'Mystery',
+    'western':          'Western',
+    'musical':          'Music',
+    'music':            'Music',
+    'crime':            'Crime',
+    'war':              'War',
+    'biography':        'History',
+    'biopic':           'History',
+    'historical':       'History',
+    'family':           'Family',
+    'superhero':        'Action',
+}
+
+
+def _extract_genre(message: str) -> str | None:
+    """Return the TMDB genre name for the first genre keyword found (longest match first)."""
+    msg_lower = message.lower()
+    for term in sorted(_GENRE_MAP, key=len, reverse=True):
+        if term in msg_lower:
+            return _GENRE_MAP[term]
+    return None
+
+
+_NEXT_TO_WATCH_PATTERNS = [
+    r'\bwhat (?:should )?i watch next\b',
+    r'\bwhat(?:\'s| is) next (?:to watch|on my list)\b',
+    r'\bjust (?:finished|watched|seen)\b',
+    r'\bdone (?:with|watching)\b',
+    r'\bwhat (?:should i |to )?watch after\b',
+    r'\bwhat else should i watch\b',
+    r'\bnext (?:movie|film|watch)\b',
+    r'\bwhat (?:should i|do i) watch\b',
+]
+
+
+def _is_next_to_watch_query(message: str) -> bool:
+    msg = message.lower()
+    return any(_re.search(p, msg) for p in _NEXT_TO_WATCH_PATTERNS)
+
+
+def _best_search_match(search_results: list[dict], candidate: str) -> dict | None:
+    """
+    Prefer an exact title match from search results over a contains match.
+    search_movies() uses str.contains so 'The Dark Knight' also returns
+    'The Dark Knight Rises', which then seeds the wrong recommendations.
+    """
+    cand_lower = candidate.strip().lower()
+    for r in search_results:
+        if r["title"].strip().lower() == cand_lower:
+            return r
+    return search_results[0] if search_results else None
+
+
+def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -> tuple[list[str], str | None]:
+    """
+    Returns (title_list, seed_title).
+    seed_title is the canonical dataset title of the movie the user mentioned
+    so the endpoint can strip it from chips (don't recommend what they just said they love).
+    """
+    # 1. Specific movie mentioned → recommendations seeded from that movie
     candidate = _find_seed_movie(message)
     if candidate:
-        search_results = service.search_movies(candidate, 3)
-        if search_results:
-            seed_title = search_results[0]["title"]
+        search_results = service.search_movies(candidate, 10)
+        match = _best_search_match(search_results, candidate)
+        if match:
+            seed_title = match["title"]
             try:
-                recs, _ = service.get_recommendations(seed_title, 5)
+                recs, _ = service.get_recommendations(seed_title, 6)
                 if recs:
-                    return [r["title"] for r in recs[:5]]
+                    # Exclude seed itself defensively (recommender already does this,
+                    # but guard against edge cases like sequel/prequel title collisions)
+                    titles = [r["title"] for r in recs if r["title"].lower() != seed_title.lower()]
+                    return titles[:5], seed_title
             except Exception:
                 pass
 
+    # 2. Genre query → use get_movies_by_genre (reliable) not semantic search (unreliable)
+    genre = _extract_genre(message)
+    if genre:
+        try:
+            result = service.get_movies_by_genre(genre, page=1, page_size=50)
+            movies = result.get("movies", [])
+            if movies:
+                # Sort by rating descending, take top 5 well-known films
+                top = sorted(movies, key=lambda m: m.get("vote_average", 0), reverse=True)[:5]
+                return [m["title"] for m in top], None
+        except Exception:
+            pass
+
+    # 3. Personalised fallback — recommendations seeded from the user's watchlist
     for title in context_titles[:3]:
         try:
             recs, _ = service.get_recommendations(title, 5)
             if recs:
-                return [r["title"] for r in recs[:5]]
+                return [r["title"] for r in recs[:5]], None
         except Exception:
             continue
 
+    # 4. Generic semantic search (open-ended query, no genre keyword, no watchlist)
     try:
         results = service.semantic_search_movies(message, 5)
         if results:
-            return [r["title"] for r in results[:5]]
+            return [r["title"] for r in results[:5]], None
     except Exception:
         pass
 
@@ -216,11 +336,11 @@ def _get_dataset_suggestions(service, message: str, context_titles: list[str]) -
         movies = trending.get("movies", [])
         if movies:
             sample = _random.sample(movies, min(5, len(movies)))
-            return [m["title"] for m in sample]
+            return [m["title"] for m in sample], None
     except Exception:
         pass
 
-    return []
+    return [], None
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -425,15 +545,82 @@ def chat(request: Request, body: ChatRequest):
     from src.services.chatbot_service import send_message
 
     try:
-        suggestions = _get_dataset_suggestions(
+        suggestions, seed_movie = _get_dataset_suggestions(
             service, body.message, body.context_titles
         )
+
+        system_note = None
+        watchlist_for_llm = body.context_titles or None
+
+        # "What should I watch next?" — check watchlist first, tell LLM the result
+        if seed_movie and body.context_titles and _is_next_to_watch_query(body.message):
+            wl_matches: list[str] = []
+            _BROAD_GENRES = {"Drama", "Adventure", "Action", "Thriller"}
+
+            # Strategy 1: forward recommendation check — is any watchlist title in
+            # the seed movie's similar-film neighbourhood?
+            try:
+                wl_recs, _ = service.get_recommendations(seed_movie, 50)
+                rec_titles_lower = {r["title"].lower() for r in wl_recs}
+                wl_matches = [t for t in body.context_titles if t.lower() in rec_titles_lower]
+            except Exception as e:
+                logger.warning("watchlist_check s1 failed for %r: %s", seed_movie, e)
+
+            # Strategy 2: genre-list overlap — require at least one specific genre in
+            # common (Drama/Adventure/Action are too broad and cause false positives).
+            if not wl_matches:
+                try:
+                    seed_rows = service.movies_df[
+                        service.movies_df["title"].str.lower() == seed_movie.lower()
+                    ]
+                    if not seed_rows.empty:
+                        seed_specific = set(seed_rows.iloc[0]["genre_list"]) - _BROAD_GENRES
+                        for t in body.context_titles:
+                            t_rows = service.movies_df[
+                                service.movies_df["title"].str.lower() == t.lower()
+                            ]
+                            if not t_rows.empty:
+                                t_specific = set(t_rows.iloc[0]["genre_list"]) - _BROAD_GENRES
+                                if seed_specific & t_specific:
+                                    wl_matches.append(t)
+                except Exception as e:
+                    logger.warning("watchlist_check s2 failed for %r: %s", seed_movie, e)
+
+            if wl_matches:
+                matched_str = ", ".join(f'"{t}"' for t in wl_matches)
+                system_note = (
+                    f'The user asked what to watch next after "{seed_movie}". '
+                    f"From their saved watchlist, these films are a close match: {matched_str}. "
+                    f"Recommend these specifically and mention they are already saved in their watchlist."
+                )
+                suggestions = wl_matches + [t for t in suggestions if t not in wl_matches]
+                watchlist_for_llm = wl_matches
+            else:
+                system_note = (
+                    f'The user asked what to watch next after "{seed_movie}". '
+                    f"None of their saved watchlist films are a close match. "
+                    f'Begin your reply with "Nothing in your watchlist is a great match for {seed_movie}, but..." '
+                    f"then recommend from the dataset titles provided."
+                )
+                watchlist_for_llm = None
+
         reply, updated_messages = send_message(
-            body.messages, body.message, suggestions
+            body.messages, body.message, suggestions,
+            watchlist_titles=watchlist_for_llm,
+            system_note=system_note,
         )
+        seed_lower = seed_movie.lower() if seed_movie else None
+        reply_lower = reply.lower()
+        # Only show chips for titles the LLM actually named, excluding the seed movie
+        # the user already mentioned (don't recommend what they just said they love).
+        mentioned = [
+            t for t in suggestions
+            if t.lower() in reply_lower and t.lower() != seed_lower
+        ]
+        fallback = [t for t in suggestions if t.lower() != seed_lower]
         return _ok({
             "reply": reply,
-            "suggested_movies": suggestions,
+            "suggested_movies": mentioned if mentioned else fallback,
             "messages": updated_messages,
         })
     except AuthenticationError:

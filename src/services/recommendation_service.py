@@ -191,9 +191,7 @@ def _fetch_movie_from_tmdb(title: str) -> dict | None:
             "cast":         cast,
             "trailer_url":      _fetch_trailer(tmdb_id),
             "watch_providers":  _fetch_watch_providers(tmdb_id),
-            # Internal field — lets get_recommendations look up the TMDB ID
-            # for movies that aren't in the local dataset.
-            "_tmdb_id":     tmdb_id,
+            "tmdb_id":      tmdb_id,
         }
         _tmdb_movie_cache[cache_key] = result
         return result
@@ -537,7 +535,7 @@ class RecommendationService:
             if not tmdb_id:
                 cached = _tmdb_movie_cache.get(movie_title.strip().lower())
                 if cached:
-                    tmdb_id = cached.get("_tmdb_id")
+                    tmdb_id = cached.get("tmdb_id")
 
             # 3. Direct TMDB search — self-sufficient, fixes the race condition
             if not tmdb_id and TMDB_API_KEY:

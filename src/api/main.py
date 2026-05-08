@@ -171,6 +171,18 @@ def _is_dev_admin(username: str, password: str) -> bool:
 
 # ── Chat helpers (unchanged from v3) ──────────────────────────────────────────
 
+# Strips trailing casual phrases that users append after a movie title.
+# e.g. "I watched Goodfellas last night" → captures "Goodfellas last night"
+# without this, because _END only matches punctuation / end-of-string.
+_TRAILING_NOISE = _re.compile(
+    r'\s+(?:'
+    r'(?:last|this|the other)\s+(?:night|week|weekend|year|month|day|time|evening)'
+    r'|yesterday|today|tonight|recently|earlier|already|again|now|though|too|lol|btw'
+    r')$',
+    _re.IGNORECASE,
+)
+
+
 def _find_seed_movie(message: str) -> str | None:
     _Q = r'["\u201c\u201d\u2018\u2019]?'
     _TITLE = r'([A-Za-z][^"\'?!\n]{1,50}?)'
@@ -200,7 +212,9 @@ def _find_seed_movie(message: str) -> str | None:
     for pat in patterns:
         m = _re.search(pat, message, _re.IGNORECASE)
         if m:
-            return m.group(1).strip().rstrip(',')
+            title = m.group(1).strip().rstrip(',')
+            title = _TRAILING_NOISE.sub('', title).strip().rstrip(',')
+            return title or None
     return None
 
 

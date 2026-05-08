@@ -23,3 +23,4 @@ stripe
 pytest
 pytest-asyncio
 httpx
+jsonschema

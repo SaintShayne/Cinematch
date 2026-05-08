@@ -32,6 +32,9 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r requirements.txt
 
+      - name: Run unit + integration tests (no server required)
+        run: pytest tests/unit/ tests/integration/ -v --tb=short
+
       - name: Copy fixture data for CI
         run: |
           mkdir -p data/raw
@@ -86,6 +89,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci --legacy-peer-deps
+
+      - name: Run Vitest unit tests
+        run: npm test
 
       - name: Build Next.js
         env:

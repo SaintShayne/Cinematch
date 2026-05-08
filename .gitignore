@@ -6,6 +6,8 @@ __pycache__/
 *.pkl
 .pytest_cache/
 .mypy_cache/
+.coverage
+coverage.xml
 
 # Environment
 .env
@@ -27,6 +29,7 @@ data/*.csv
 frontend/.next/
 frontend/node_modules/
 frontend/.env.local
+frontend/coverage/
 
 # Claude Code — local AI context (never commit — contains personal details)
 CLAUDE.md

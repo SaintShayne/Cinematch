@@ -169,6 +169,73 @@ def _is_dev_admin(username: str, password: str) -> bool:
     return username == _DEV_ADMIN_USERNAME and password == _DEV_ADMIN_PASSWORD
 
 
+_EMAIL_RE = _re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+
+
+def _verify_admin(request: Request) -> str:
+    """
+    FastAPI dependency: verify caller holds a valid Supabase session with role=admin.
+    Returns the Supabase user_id on success; raises HTTPException on failure.
+    Falls through to 'dev-admin' when no Supabase credentials are configured (local dev).
+    """
+    supabase_url = (os.environ.get("SUPABASE_URL") or
+                    os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not supabase_url or not service_key:
+        return "dev-admin"
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = auth_header[7:]
+
+    try:
+        user_resp = _http.get(
+            f"{supabase_url}/auth/v1/user",
+            headers={"Authorization": f"Bearer {token}", "apikey": service_key},
+            timeout=5,
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Auth service unreachable")
+
+    if not user_resp.ok:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    user_id = user_resp.json().get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Could not identify user")
+
+    try:
+        profile_resp = _http.get(
+            f"{supabase_url}/rest/v1/profiles",
+            params={"id": f"eq.{user_id}", "select": "role"},
+            headers={"Authorization": f"Bearer {service_key}", "apikey": service_key},
+            timeout=5,
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Auth service unreachable")
+
+    profiles = profile_resp.json() if profile_resp.ok else []
+    if not profiles or profiles[0].get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    return user_id
+
+
+def _is_allowed_url(url: str) -> bool:
+    """Return True if url's origin is in the configured CORS allowed_origins list."""
+    if not url:
+        return False
+    if "*" in allowed_origins:
+        return True
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}" in allowed_origins
+    except Exception:
+        return False
+
+
 # ── Chat helpers (unchanged from v3) ──────────────────────────────────────────
 
 # Strips trailing casual phrases that users append after a movie title.
@@ -363,6 +430,13 @@ class ChatRequest(BaseModel):
     messages: list[dict[str, str]] = []
     message: str
     context_titles: list[str] = []
+
+    @field_validator("messages")
+    @classmethod
+    def messages_not_too_many(cls, v: list) -> list:
+        if len(v) > 50:
+            raise ValueError("conversation history cannot exceed 50 messages")
+        return v
 
     @field_validator("message")
     @classmethod
@@ -653,7 +727,8 @@ def chat(request: Request, body: ChatRequest):
 # In production, replace this with a proper Supabase session check.
 
 @app.post("/admin/login", tags=["Admin"])
-def admin_login(body: AdminLoginRequest):
+@limiter.limit("5/minute")
+def admin_login(request: Request, body: AdminLoginRequest):
     """
     DEV ONLY — Authenticate with the hardcoded admin account.
     Returns a synthetic session token (not a real JWT — use Supabase auth in prod).
@@ -674,7 +749,8 @@ def admin_login(body: AdminLoginRequest):
 # ── Admin: stats & user management ───────────────────────────────────────────
 
 @app.get("/admin/stats", tags=["Admin"])
-def admin_stats():
+@limiter.limit("30/minute")
+def admin_stats(request: Request, _uid: str = Depends(_verify_admin)):
     """High-level dataset statistics for the admin dashboard."""
     stats = service.get_stats()
     return _ok({
@@ -685,7 +761,8 @@ def admin_stats():
 
 
 @app.get("/admin/users", tags=["Admin"])
-def get_admin_users():
+@limiter.limit("20/minute")
+def get_admin_users(request: Request, _uid: str = Depends(_verify_admin)):
     """Return all user profiles using the Supabase service role key (bypasses RLS)."""
     supabase_url = (os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")
     service_key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -703,12 +780,14 @@ def get_admin_users():
 
 
 @app.get("/admin/feature-flags", tags=["Admin"])
-def get_feature_flags():
+@limiter.limit("30/minute")
+def get_feature_flags(request: Request, _uid: str = Depends(_verify_admin)):
     return _ok({"flags": _feature_flags})
 
 
 @app.post("/admin/feature-flags", tags=["Admin"])
-def set_feature_flag(body: FeatureFlagRequest):
+@limiter.limit("10/minute")
+def set_feature_flag(request: Request, body: FeatureFlagRequest, _uid: str = Depends(_verify_admin)):
     if body.flag not in _feature_flags:
         return _error("NOT_FOUND", f"Flag '{body.flag}' does not exist", 404)
     _feature_flags[body.flag] = body.enabled
@@ -722,7 +801,8 @@ def set_feature_flag(body: FeatureFlagRequest):
 # ── Admin: 2FA — TOTP setup ───────────────────────────────────────────────────
 
 @app.post("/admin/2fa/setup", tags=["Admin 2FA"])
-def setup_2fa(body: TwoFASetupRequest):
+@limiter.limit("5/minute")
+def setup_2fa(request: Request, body: TwoFASetupRequest, _uid: str = Depends(_verify_admin)):
     """
     Generate a TOTP secret for the given admin user.
     Returns the secret and a base64-encoded QR code PNG.
@@ -760,7 +840,8 @@ def setup_2fa(body: TwoFASetupRequest):
 
 
 @app.post("/admin/2fa/verify", tags=["Admin 2FA"])
-def verify_2fa(body: TwoFAVerifyRequest):
+@limiter.limit("5/minute")
+def verify_2fa(request: Request, body: TwoFAVerifyRequest, _uid: str = Depends(_verify_admin)):
     """
     Verify a TOTP token.  On success, marks 2FA as active for the user.
     """
@@ -780,7 +861,8 @@ def verify_2fa(body: TwoFAVerifyRequest):
 # ── Admin: 2FA — Telegram bot config ─────────────────────────────────────────
 
 @app.post("/admin/2fa/telegram/config", tags=["Admin 2FA"])
-def save_telegram_config(body: TelegramConfigRequest):
+@limiter.limit("10/minute")
+def save_telegram_config(request: Request, body: TelegramConfigRequest, _uid: str = Depends(_verify_admin)):
     """
     Save the Telegram bot token and target chat ID for a user.
     The bot token is stored as-is in memory (dev only); use encrypted storage
@@ -798,7 +880,8 @@ def save_telegram_config(body: TelegramConfigRequest):
 
 
 @app.get("/admin/2fa/telegram/config/{user_id}", tags=["Admin 2FA"])
-def get_telegram_config(user_id: str):
+@limiter.limit("20/minute")
+def get_telegram_config(request: Request, user_id: str, _uid: str = Depends(_verify_admin)):
     """Return the saved Telegram config for a user (token is masked)."""
     cfg = _telegram_config_store.get(user_id)
     if not cfg:
@@ -860,7 +943,8 @@ def _send_telegram_otp(user_id: str, code: str):
 
 
 @app.post("/admin/2fa/telegram/send", tags=["Admin 2FA"])
-def telegram_send_otp(body: TelegramOTPRequest):
+@limiter.limit("3/minute")
+def telegram_send_otp(request: Request, body: TelegramOTPRequest, _uid: str = Depends(_verify_admin)):
     """
     Generate a 6-digit OTP and deliver it to the user's configured Telegram chat.
     Returns an error if no bot config has been saved for this user.
@@ -894,7 +978,8 @@ def telegram_send_otp(body: TelegramOTPRequest):
 
 
 @app.post("/admin/2fa/telegram/verify", tags=["Admin 2FA"])
-def telegram_verify_otp(body: TelegramOTPVerifyRequest):
+@limiter.limit("5/minute")
+def telegram_verify_otp(request: Request, body: TelegramOTPVerifyRequest, _uid: str = Depends(_verify_admin)):
     """Verify a Telegram OTP code. On success, marks 2FA as active for the user."""
     record = _telegram_otp_store.get(body.user_id)
     if not record:
@@ -918,7 +1003,8 @@ def telegram_verify_otp(body: TelegramOTPVerifyRequest):
 # ── Admin: 2FA — status & disable ────────────────────────────────────────────
 
 @app.get("/admin/2fa/status/{user_id}", tags=["Admin 2FA"])
-def get_2fa_status(user_id: str):
+@limiter.limit("20/minute")
+def get_2fa_status(request: Request, user_id: str, _uid: str = Depends(_verify_admin)):
     """Return whether 2FA is enabled for a user and which method is active."""
     record = _admin_2fa_store.get(user_id)
     if not record or not record.get("enable_2fa"):
@@ -927,7 +1013,8 @@ def get_2fa_status(user_id: str):
 
 
 @app.post("/admin/2fa/disable", tags=["Admin 2FA"])
-def disable_2fa(body: TwoFASetupRequest):
+@limiter.limit("5/minute")
+def disable_2fa(request: Request, body: TwoFASetupRequest, _uid: str = Depends(_verify_admin)):
     """Disable and remove 2FA for a user."""
     if body.user_id in _admin_2fa_store:
         del _admin_2fa_store[body.user_id]
@@ -958,7 +1045,8 @@ logging.getLogger("cinematch.api").addHandler(_buf_handler)
 
 
 @app.get("/admin/logs", tags=["Admin"])
-def get_logs():
+@limiter.limit("20/minute")
+def get_logs(request: Request, _uid: str = Depends(_verify_admin)):
     """Return the last 100 in-memory log entries."""
     return _ok({"count": len(_in_memory_log_buffer), "logs": list(reversed(_in_memory_log_buffer))})
 
@@ -980,6 +1068,8 @@ def create_checkout_session(request: Request, body: CheckoutSessionRequest):
     """Create a Stripe Checkout Session for a $3 one-time support payment."""
     if not _stripe.api_key:
         return _error("CONFIG_MISSING", "Payment is not configured yet", 503)
+    if not _is_allowed_url(body.success_url) or not _is_allowed_url(body.cancel_url):
+        return _error("INVALID_URL", "Redirect URLs must be on an allowed origin", 400)
     try:
         create_kwargs: dict = dict(
             payment_method_types=["card"],
@@ -1026,11 +1116,9 @@ async def stripe_webhook(request: Request):
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        if webhook_secret:
-            event = _stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        else:
-            import json as _json
-            event = _stripe.Event.construct_from(_json.loads(payload), _stripe.api_key)
+        if not webhook_secret:
+            return JSONResponse(status_code=400, content={"error": "Webhook secret not configured"})
+        event = _stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
     except Exception as exc:
         logger.error("stripe webhook error", extra={"error": str(exc)})
         return JSONResponse(status_code=400, content={"error": str(exc)})
@@ -1095,6 +1183,10 @@ async def submit_report(
     category    = category.strip().lower()
     subject     = subject.strip()
     description = description.strip()
+    if email:
+        email = email.strip()
+        if len(email) > 254 or not _EMAIL_RE.match(email):
+            return _error("INVALID_EMAIL", "Invalid email address", 400)
 
     if category not in ("bug", "feature", "feedback"):
         return _error("INVALID_CATEGORY", "category must be bug, feature, or feedback", 400)
@@ -1179,7 +1271,8 @@ async def submit_report(
 
 
 @app.get("/admin/reports", tags=["Admin"])
-def get_admin_reports():
+@limiter.limit("20/minute")
+def get_admin_reports(request: Request, _uid: str = Depends(_verify_admin)):
     """Return all submitted reports from the Supabase reports table."""
     supabase_url = (os.environ.get("SUPABASE_URL") or
                     os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")).rstrip("/")

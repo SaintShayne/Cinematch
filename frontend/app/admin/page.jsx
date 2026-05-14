@@ -100,63 +100,72 @@ export default function AdminDashboard() {
   const [tgSending, setTgSending]       = useState(false)
   const [tgInput, setTgInput]           = useState('')
 
+  // ── Auth headers ──────────────────────────────────────────────────────────
+  // Reads the live Supabase session token and returns it as an Authorization
+  // header for admin API calls. The backend _verify_admin dependency requires this.
+
+  const getAuthHeaders = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }, [supabase])
+
   // ── Fetch helpers ─────────────────────────────────────────────────────────
 
   const fetchStats = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/stats`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/stats`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setStats(json)
     } catch { /* non-fatal */ }
-  }, [])
+  }, [getAuthHeaders])
 
   const fetchFlags = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/feature-flags`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/feature-flags`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setFlags(json.flags)
     } catch { /* non-fatal */ }
-  }, [])
+  }, [getAuthHeaders])
 
   const fetchLogs = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/logs`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/logs`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setLogs(json.logs ?? [])
     } catch { /* non-fatal */ }
-  }, [])
+  }, [getAuthHeaders])
 
   const fetch2FAStatus = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/2fa/status/${adminUserId}`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/2fa/status/${adminUserId}`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setTwoFAStatus({ enabled: json.enabled, method: json.method })
     } catch { /* non-fatal */ }
-  }, [adminUserId])
+  }, [adminUserId, getAuthHeaders])
 
   const fetchTelegramConfig = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/2fa/telegram/config/${adminUserId}`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/2fa/telegram/config/${adminUserId}`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setTgConfig(json.configured ? json : null)
     } catch { /* non-fatal */ }
-  }, [adminUserId])
+  }, [adminUserId, getAuthHeaders])
 
   const [usersFetched, setUsersFetched] = useState(false)
 
   const fetchUsers = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/users`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/users`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setUsers(json.users ?? [])
     } catch { /* non-fatal */ }
     setUsersFetched(true)
-  }, [])
+  }, [getAuthHeaders])
 
   const [reports, setReports] = useState([])
   const [reportsFetched, setReportsFetched] = useState(false)
 
   const fetchReports = useCallback(async () => {
     try {
-      const json = await fetch(`${API}/admin/reports`).then((r) => r.json())
+      const json = await fetch(`${API}/admin/reports`, { headers: await getAuthHeaders() }).then((r) => r.json())
       if (json.success) setReports(json.reports ?? [])
     } catch { /* non-fatal */ }
     setReportsFetched(true)
-  }, [])
+  }, [getAuthHeaders])
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
@@ -212,7 +221,7 @@ export default function AdminDashboard() {
     try {
       const json = await fetch(`${API}/admin/feature-flags`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ flag, enabled: !current }),
       }).then((r) => r.json())
       if (json.success) setFlags((f) => ({ ...f, [flag]: !current }))
@@ -254,7 +263,7 @@ export default function AdminDashboard() {
     try {
       const json = await fetch(`${API}/admin/2fa/telegram/config`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ user_id: adminUserId, bot_token: tgBotToken.trim(), chat_id: tgChatId.trim() }),
       }).then((r) => r.json())
       if (json.success) {
@@ -274,7 +283,7 @@ export default function AdminDashboard() {
     try {
       const json = await fetch(`${API}/admin/2fa/setup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ user_id: adminUserId }),
       }).then((r) => r.json())
       if (json.success) setQrCode(json.qr_code)
@@ -289,7 +298,7 @@ export default function AdminDashboard() {
     try {
       const json = await fetch(`${API}/admin/2fa/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ user_id: adminUserId, token: totpInput }),
       }).then((r) => r.json())
       if (json.success) {
@@ -312,7 +321,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`${API}/admin/2fa/telegram/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ user_id: adminUserId }),
       })
 
@@ -341,7 +350,7 @@ export default function AdminDashboard() {
     try {
       const json = await fetch(`${API}/admin/2fa/telegram/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ user_id: adminUserId, code: tgInput }),
       }).then((r) => r.json())
       if (json.success) {
@@ -363,7 +372,7 @@ export default function AdminDashboard() {
     try {
       const json = await fetch(`${API}/admin/2fa/disable`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeaders() },
         body: JSON.stringify({ user_id: adminUserId }),
       }).then((r) => r.json())
       if (json.success) {

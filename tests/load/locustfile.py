@@ -55,13 +55,13 @@ SEED_MOVIES = [
 
 SEARCH_QUERIES = [
     "dark knight",
-    "space",
-    "romantic",
-    "thriller",
-    "animation",
-    "crime",
-    "Avatar",
-    "Nolan",
+    "inception",
+    "matrix",
+    "avatar",
+    "godfather",
+    "pulp fiction",
+    "interstellar",
+    "goodfellas",
 ]
 
 

@@ -42,6 +42,7 @@ export default function ReportPage() {
   const [file,        setFile]        = useState(null)
   const [fileError,   setFileError]   = useState(null)
   const [status,      setStatus]      = useState(null)
+  const [errorMsg,    setErrorMsg]    = useState(null)
   const fileRef = useRef(null)
 
   const handleFile = (selected) => {
@@ -56,6 +57,7 @@ export default function ReportPage() {
     e.preventDefault()
     if (fileError) return
     setStatus('loading')
+    setErrorMsg(null)
     try {
       const fd = new FormData()
       fd.append('category',    category)
@@ -66,8 +68,14 @@ export default function ReportPage() {
 
       const res  = await fetch(`${API}/report`, { method: 'POST', body: fd })
       const data = await res.json()
-      setStatus(data.success ? 'success' : 'error')
+      if (data.success) {
+        setStatus('success')
+      } else {
+        setErrorMsg(data.error?.message ?? 'Something went wrong. Please try again.')
+        setStatus('error')
+      }
     } catch {
+      setErrorMsg('Could not reach the server. Please check your connection and try again.')
       setStatus('error')
     }
   }
@@ -212,7 +220,7 @@ export default function ReportPage() {
         </div>
 
         {status === 'error' && (
-          <p className="text-xs text-red">Something went wrong. Please try again.</p>
+          <p className="text-xs text-red">{errorMsg}</p>
         )}
 
         <button
